@@ -22,6 +22,7 @@ dependencies:
   share_plus: ^7.2.1
   firebase_auth: ^4.15.0           # Correct version
   firebase_core: ^2.13.0           # Correct version
+  webview_flutter: ^4.4.2          # For in-app browsing
 
 dev_dependencies:
   flutter_test:

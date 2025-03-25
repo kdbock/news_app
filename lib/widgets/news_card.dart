@@ -3,7 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:news_app/models/article.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:news_app/screens/web_view_screen.dart';
+import 'package:news_app/screens/article_detail_screen.dart';
 
 class NewsCard extends StatelessWidget {
   final Article article;
@@ -18,16 +19,23 @@ class NewsCard extends StatelessWidget {
     );
   }
 
-  void _openArticle() async {
+  // Modified to use BuildContext parameter
+  void _openArticle(BuildContext context) async {
     if (onReadMore != null) {
       onReadMore!();
     } else {
-      final Uri url = Uri.parse(article.link);
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url);
-      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (context) =>
+                  WebViewScreen(url: article.link, title: article.title),
+        ),
+      );
     }
   }
+
+  // Removed unused _onArticleTap method
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +44,7 @@ class NewsCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: InkWell(
-        onTap: _openArticle, // Make the whole card clickable
+        onTap: () => _openArticle(context), // Pass context here
         borderRadius: BorderRadius.circular(12.0),
         child: Column(
           children: [
@@ -50,7 +58,7 @@ class NewsCard extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8.0),
                     child: InkWell(
-                      onTap: _openArticle,
+                      onTap: () => _openArticle(context), // Pass context here
                       child: CachedNetworkImage(
                         imageUrl: article.imageUrl,
                         height: 90,
@@ -82,7 +90,8 @@ class NewsCard extends StatelessWidget {
                       children: [
                         // Title (clickable)
                         InkWell(
-                          onTap: _openArticle,
+                          onTap:
+                              () => _openArticle(context), // Pass context here
                           child: Text(
                             article.title,
                             style: const TextStyle(
@@ -143,7 +152,7 @@ class NewsCard extends StatelessWidget {
 
                   // Read more button
                   TextButton(
-                    onPressed: _openArticle,
+                    onPressed: () => _openArticle(context), // Pass context here
                     style: TextButton.styleFrom(
                       foregroundColor: const Color(0xFFd2982a),
                     ),

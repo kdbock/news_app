@@ -4,6 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 import 'package:news_app/services/auth_service.dart';
 import 'package:news_app/screens/home_screen.dart';
+import 'package:news_app/screens/dashboard_screen.dart'; // Add this import
 // import 'package:sign_in_with_apple/sign_in_with_apple.dart';  // Comment out temporarily
 
 class AuthScreen extends StatefulWidget {
@@ -145,7 +146,7 @@ class _AuthScreenState extends State<AuthScreen>
       final user = await _authService.signInWithGoogle();
 
       if (user != null && mounted) {
-        _tempNavigateToHome(); // Use direct navigation for now
+        Navigator.pushReplacementNamed(context, '/dashboard');
       }
     } catch (e) {
       setState(() => _errorMessage = "Google sign-in failed: $e");
@@ -208,9 +209,7 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   void _tempNavigateToHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => const HomeScreen()),
-    );
+    Navigator.pushReplacementNamed(context, '/dashboard');
   }
 
   Widget _buildSocialButtons() {
@@ -235,7 +234,12 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildLoginTab() {
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.fromLTRB(
+          20.0,
+          30.0,
+          20.0,
+          20.0,
+        ), // Added more top padding
         child: Form(
           // Use the login-specific form key
           key: _loginFormKey,
@@ -302,7 +306,12 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildRegisterTab() {
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.fromLTRB(
+          20.0,
+          30.0,
+          20.0,
+          20.0,
+        ), // Added more top padding
         child: Form(
           // Use the register-specific form key
           key: _registerFormKey,
@@ -407,15 +416,145 @@ class _AuthScreenState extends State<AuthScreen>
                             builder:
                                 (context) => AlertDialog(
                                   title: const Text('Privacy Policy'),
-                                  content: const SingleChildScrollView(
-                                    child: Text(
-                                      'Your privacy policy text goes here...',
+                                  content: SingleChildScrollView(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Text(
+                                          'PRIVACY POLICY',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        SizedBox(height: 10),
+                                        Text('Last Updated: March 25, 2025'),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'Magic Mile Media, LLC ("we," "our," or "us") operates the Neuse News, NC Political News, and Neuse News Sports mobile application (the "Service"). This Privacy Policy informs you of our policies regarding the collection, use, and disclosure of personal data when you use our Service.',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'INFORMATION WE COLLECT',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          '• Personal Information: Name, email address, phone number, ZIP code, and date of birth provided during registration.\n'
+                                          '• Usage Data: Information on how you access and use the Service.\n'
+                                          '• Device Information: Device type, operating system, and browser information.\n'
+                                          '• Location Data: General location based on IP address or ZIP code.',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'HOW WE USE YOUR INFORMATION',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          '• To provide and maintain our Service\n'
+                                          '• To notify you about changes to our Service\n'
+                                          '• To allow you to participate in interactive features\n'
+                                          '• To provide customer support\n'
+                                          '• To gather analysis to improve our Service\n'
+                                          '• To send newsletters and marketing communications you have opted into\n'
+                                          '• To monitor the usage of our Service\n'
+                                          '• To detect, prevent and address technical issues',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'DISCLOSURE OF DATA',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          'We may disclose your Personal Data in the following situations:\n'
+                                          '• To affiliates: Including Neuse News, NC Political News, and Neuse News Sports\n'
+                                          '• To service providers: To perform service-related services or assist in analyzing how our Service is used\n'
+                                          '• For business transfers: In connection with any merger, acquisition, or sale of assets\n'
+                                          '• With your consent: With your explicit permission\n'
+                                          '• For legal requirements: To comply with legal obligations',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'SECURITY',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          'The security of your data is important to us, but remember that no method of transmission over the Internet or method of electronic storage is 100% secure.',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'YOUR RIGHTS',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          'You have the right to:\n'
+                                          '• Access, update, or delete your personal information\n'
+                                          '• Object to or restrict the processing of your personal data\n'
+                                          '• Request a portable copy of your personal data\n'
+                                          '• Opt out of marketing communications',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'CHANGES TO THIS PRIVACY POLICY',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          'We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last Updated" date.',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'CONTACT US',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          'If you have any questions about this Privacy Policy, please contact us at:\n'
+                                          'Magic Mile Media, LLC\n'
+                                          'Email: privacy@magicmilemedia.com\n'
+                                          'Phone: (252) 555-1212',
+                                        ),
+                                      ],
                                     ),
                                   ),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(context),
                                       child: const Text('Close'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        setState(
+                                          () => _privacyPolicyAccepted = true,
+                                        );
+                                      },
+                                      child: const Text(
+                                        'Accept',
+                                        style: TextStyle(
+                                          color: Color(0xFFd2982a),
+                                        ),
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -469,7 +608,7 @@ class _AuthScreenState extends State<AuthScreen>
         title: Column(
           children: [
             // Add padding at the top to push logo down slightly
-            const SizedBox(height: 8),
+            const SizedBox(height: 12), // Increased from 8
             // Add the centered logo
             Center(
               child: Image.asset(
@@ -478,40 +617,84 @@ class _AuthScreenState extends State<AuthScreen>
                 fit: BoxFit.contain,
               ),
             ),
-            // Add space between logo and tabs
-            const SizedBox(height: 8),
+            // Add more space between logo and tabs
+            const SizedBox(height: 16), // Increased from 8
           ],
         ),
-        toolbarHeight: 100, // Increase height to accommodate the logo
+        toolbarHeight: 120, // Increased from 100 to accommodate extra padding
         backgroundColor: Colors.white, // Changed to white
         automaticallyImplyLeading: false, // Remove back button
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48.0),
-          child: Container(
-            color: const Color(0xFFd2982a), // Gold background for tabs
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: Colors.white,
-              indicatorWeight:
-                  3.0, // Thicker indicator for white outline effect
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white70,
-              dividerColor: Colors.white, // White divider
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-              tabs: const [Tab(text: 'LOGIN'), Tab(text: 'REGISTER')],
-              // Add decoration to create white border effect
-              indicator: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Colors.white, width: 3.0),
+          child: Stack(
+            children: [
+              // Base container (white background)
+              Container(
+                color: Colors.white,
+                height: 48.0,
+              ), // Changed from gold to white
+              // Custom tab bar with rounded corners
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: Colors.white,
+                  unselectedLabelColor:
+                      Colors.white60, // Dimmer text for unselected
+                  labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  dividerColor: Colors.transparent,
+                  indicatorWeight: 0, // Remove default indicator
+                  indicatorSize: TabBarIndicatorSize.tab, // Full width tabs
+                  // Custom tab decoration
+                  indicator: BoxDecoration(
+                    color: const Color(0xFFd2982a), // Selected tab color
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(12),
+                      topRight: Radius.circular(12),
+                    ),
+                  ),
+                  // Gap between tabs
+                  labelPadding: const EdgeInsets.symmetric(
+                    horizontal: 6.0,
+                  ), // Increased gap
+                  tabs: [
+                    _buildCustomTab("LOGIN", _tabController.index == 0),
+                    _buildCustomTab("REGISTER", _tabController.index == 1),
+                  ],
+                  onTap: (index) {
+                    setState(() {}); // Refresh UI when tab changes
+                  },
                 ),
               ),
-            ),
+            ],
           ),
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: [_buildLoginTab(), _buildRegisterTab()],
+      ),
+    );
+  }
+
+  Widget _buildCustomTab(String text, bool isSelected) {
+    return Container(
+      decoration: BoxDecoration(
+        color:
+            isSelected
+                ? const Color(0xFFd2982a) // Selected tab is gold
+                : const Color(0xFFb88116), // Unselected tab is darker gold
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          topRight: Radius.circular(12),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Text(
+          text,
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
       ),
     );
   }

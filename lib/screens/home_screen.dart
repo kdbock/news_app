@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Add this import for SystemChrome
 import 'package:news_app/services/news_service.dart';
 import 'package:news_app/models/article.dart';
 import 'package:news_app/widgets/news_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart'; // Make sure this is in pubspec.yaml
+import 'package:news_app/screens/dashboard_screen.dart'; // Add this import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +25,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadNews();
+
+    // Use this method to ensure status bar is always white
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      SystemChrome.setSystemUIOverlayStyle(
+        const SystemUiOverlayStyle(
+          statusBarColor: Colors.white, // Completely white
+          statusBarBrightness: Brightness.light, // For iOS
+          statusBarIconBrightness: Brightness.dark, // For Android
+        ),
+      );
+    });
   }
 
   Future<void> _loadNews() async {
@@ -77,146 +90,56 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.white, // Simplified to use built-in white
-        elevation: 0.5, // Subtle shadow
-        title: Image.asset(
-          'assets/images/header.png',
-          height: 80,
-          fit: BoxFit.contain,
-        ),
-        centerTitle: true,
-        iconTheme: const IconThemeData(
-          color: Color(0xFFd2982a), // Gold hamburger menu
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.search,
-              color: Color(0xFFd2982a), // Gold search icon
-            ),
-            onPressed: () {
-              // Show search dialog
-            },
-          ),
-        ],
-      ),
-      drawer: Drawer(
-        backgroundColor: Colors.white, // Make entire drawer background white
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                color: Colors.white, // Keep header white to match drawer
-              ),
-              child: Center(
-                child: Image.asset(
-                  'assets/images/loading_logo.png',
-                  height: 80,
+    // Return just the content without Scaffold, AppBar or BottomNavigationBar
+    return _isLoading
+        ? const Center(
+          child: CircularProgressIndicator(color: Color(0xFFd2982a)),
+        )
+        : RefreshIndicator(
+          onRefresh: _loadNews,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Category header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      _currentCategory,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2d2c31),
+                      ),
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(
+                        Icons.filter_list,
+                        color: Color(0xFFd2982a),
+                        size: 20,
+                      ),
+                      label: const Text(
+                        'Filter',
+                        style: TextStyle(
+                          color: Color(0xFFd2982a),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          builder: (context) => _buildCategoriesSheet(),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
-              // Make the header shorter
-              padding: const EdgeInsets.symmetric(
-                vertical: 12.0,
-                horizontal: 16.0,
-              ),
-            ),
-            // News Categories
-            _buildDrawerItem(
-              'Local News',
-              Icons.location_on,
-              url: 'https://www.neusenews.com/index?format=rss',
-            ),
-            _buildDrawerItem(
-              'NC Politics',
-              Icons.gavel,
-              url: 'https://www.ncpoliticalnews.com/news?format=rss',
-            ),
-            _buildDrawerItem(
-              'Sports',
-              Icons.sports_baseball,
-              url: 'https://www.neusenewssports.com/news-1?format=rss',
-            ),
-            _buildDrawerItem(
-              'Columns',
-              Icons.article,
-              url:
-                  'https://www.neusenews.com/index/category/Columns?format=rss',
-            ),
-            _buildDrawerItem(
-              'Matters of Record',
-              Icons.summarize,
-              url:
-                  'https://www.neusenews.com/index/category/Matters+of+Record?format=rss',
-            ),
-            _buildDrawerItem(
-              'Obituaries',
-              Icons.sentiment_very_dissatisfied,
-              url:
-                  'https://www.neusenews.com/index/category/Obituaries?format=rss',
-            ),
-            _buildDrawerItem(
-              'Public Notices',
-              Icons.announcement,
-              url:
-                  'https://www.neusenews.com/index/category/Public+Notices?format=rss',
-            ),
-            _buildDrawerItem(
-              'Classifieds',
-              Icons.sell,
-              url:
-                  'https://www.neusenews.com/index/category/Classifieds?format=rss',
-            ),
-            _buildDrawerItem(
-              'Order Classifieds',
-              Icons.shopping_cart,
-              externalUrl: 'https://www.neusenews.com/order-classifieds',
-            ),
 
-            const Divider(),
-
-            // User Actions
-            _buildDrawerItem('Profile', Icons.person, route: '/profile'),
-            _buildDrawerItem(
-              'Edit Profile',
-              Icons.edit,
-              route: '/edit_profile',
-            ),
-            _buildDrawerItem(
-              'Submit Press Release',
-              Icons.send,
-              route: '/submit_press_release',
-            ),
-            _buildDrawerItem(
-              'Submit News Tip',
-              Icons.tips_and_updates,
-              route: '/submit_news_tip',
-            ),
-            _buildDrawerItem(
-              'Submit Sponsored Event',
-              Icons.event,
-              route: '/submit_sponsored_event',
-            ),
-            _buildDrawerItem(
-              'Submit Sponsored News',
-              Icons.newspaper,
-              route: '/submit_sponsored_news',
-            ),
-
-            const Divider(),
-
-            // Logout
-            _buildDrawerItem('Logout', Icons.logout, isLogout: true),
-          ],
-        ),
-      ),
-      body:
-          _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
-                onRefresh: _loadNews,
+              // Article list
+              Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.only(top: 8.0),
                   itemCount: _articles.length,
@@ -228,126 +151,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
               ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white, // Added white background
-        elevation: 8.0, // Add shadow for better separation
-        currentIndex: _currentNavIndex,
-        onTap: (index) {
-          setState(() => _currentNavIndex = index);
-          // Handle navigation
-          switch (index) {
-            case 0: // Home
-              _loadCategoryNews(
-                'Local News',
-                'https://www.neusenews.com/index?format=rss',
-              );
-              break;
-            case 1: // News
-              showModalBottomSheet(
-                context: context,
-                builder: (context) => _buildCategoriesSheet(),
-              );
-              break;
-            case 2: // Weather
-              Navigator.pushNamed(context, '/weather');
-              break;
-            case 3: // Calendar
-              Navigator.pushNamed(context, '/calendar');
-              break;
-          }
-        },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFFd2982a),
-        unselectedItemColor: Colors.grey[600], // Slightly darker than default
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: 'News'),
-          BottomNavigationBarItem(icon: Icon(Icons.cloud), label: 'Weather'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_month),
-            label: 'Calendar',
+            ],
           ),
-        ],
-      ),
-    );
+        );
   }
 
-  // Update the _buildDrawerItem method with darker text and compact spacing
-  Widget _buildDrawerItem(
-    String title,
-    IconData icon, {
-    String? url,
-    String? externalUrl,
-    String? route,
-    bool isLogout = false,
-  }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: const Color(0xFF2d2c31), // Dark gray icons
-      ),
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Color(0xFF2d2c31), // Darker text (dark gray)
-          fontWeight: FontWeight.w500, // Medium weight for better visibility
-        ),
-      ),
-      dense: true, // Makes the list tile more compact
-      visualDensity: const VisualDensity(
-        vertical: -1,
-      ), // Further reduce vertical spacing
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 16.0,
-        vertical: 0,
-      ), // Custom padding
-      onTap: () async {
-        Navigator.pop(context); // Close drawer first
-
-        // Handle different navigation types
-        if (url != null) {
-          // Load RSS feed with category
-          await _loadCategoryNews(title, url);
-        } else if (externalUrl != null) {
-          // Launch external URL (requires url_launcher package)
-          final Uri uri = Uri.parse(externalUrl);
-          if (await canLaunchUrl(uri)) {
-            await launchUrl(uri, mode: LaunchMode.externalApplication);
-          } else {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Could not open $externalUrl')),
-              );
-            }
-          }
-        } else if (route != null) {
-          // Navigate to internal screen
-          Navigator.pushNamed(context, route);
-        } else if (isLogout) {
-          // Handle logout
-          _handleLogout();
-        }
-      },
-    );
-  }
-
-  // Add this method to handle logout
-  void _handleLogout() async {
-    try {
-      await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        // Navigate back to login screen and clear navigation stack
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil('/login', (Route<dynamic> route) => false);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error signing out: $e')));
-    }
-  }
-
+  // The helper methods stay the same
   Widget _buildCategoriesSheet() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20),
@@ -398,5 +207,71 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+}
+
+// Keep the NewsSearchDelegate but it will now be used from dashboard_screen.dart
+class NewsSearchDelegate extends SearchDelegate<String> {
+  final List<Article> articles;
+  final Function(Article) onArticleTap;
+
+  NewsSearchDelegate(this.articles, this.onArticleTap);
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => close(context, ''),
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return _buildSearchResults();
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return _buildSearchResults();
+  }
+
+  Widget _buildSearchResults() {
+    final results =
+        query.isEmpty
+            ? []
+            : articles
+                .where(
+                  (a) =>
+                      a.title.toLowerCase().contains(query.toLowerCase()) ||
+                      a.excerpt.toLowerCase().contains(query.toLowerCase()),
+                )
+                .toList();
+
+    return results.isEmpty
+        ? Center(
+          child: Text(
+            query.isEmpty ? 'Enter search term' : 'No results found',
+            style: const TextStyle(fontSize: 18, color: Colors.grey),
+          ),
+        )
+        : ListView.builder(
+          itemCount: results.length,
+          itemBuilder: (context, index) {
+            return NewsCard(
+              article: results[index],
+              onReadMore: () {
+                close(context, '');
+                onArticleTap(results[index]);
+              },
+            );
+          },
+        );
   }
 }

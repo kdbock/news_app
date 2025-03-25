@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:news_app/screens/splash_screen.dart';
 import 'package:news_app/screens/login_screen.dart';
 import 'package:news_app/screens/home_screen.dart';
-// Import other screens as needed
+import 'package:news_app/screens/dashboard_screen.dart';
+import 'package:news_app/screens/article_detail_screen.dart';
+import 'package:news_app/screens/web_view_screen.dart';
+import 'package:news_app/screens/weather_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
 
-  // Initialize Firebase
-  try {
-    await Firebase.initializeApp();
-    print('Firebase initialized successfully');
-  } catch (e) {
-    print('Failed to initialize Firebase: $e');
-  }
+  // Set preferred orientation
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
   runApp(const MyApp());
 }
@@ -26,35 +29,24 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Neuse News',
-      debugShowCheckedModeBanner: false, // Removes the debug banner
       theme: ThemeData(
         primaryColor: const Color(0xFFd2982a), // Gold
-        scaffoldBackgroundColor: Colors.white, // White background
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFd2982a), // Gold header
-          titleTextStyle: TextStyle(
-            color: Color(0xFF2d2c31), // Dark gray text
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFd2982a),
+          primary: const Color(0xFFd2982a),
         ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFd2982a), // Gold button
-            foregroundColor: Colors.white, // White text
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12), // Modern corners
-            ),
-          ),
-        ),
+        useMaterial3: true,
+        scaffoldBackgroundColor: Colors.white,
       ),
-      // Both approaches work - you can use either one
-      home: const SplashScreen(), // Direct approach
-      // Named routes for deeper navigation
+      // Start with splash screen instead
+      home: const SplashScreen(),
       routes: {
+        '/splash': (context) => const SplashScreen(),
         '/login': (context) => const AuthScreen(),
         '/home': (context) => const HomeScreen(),
-        // Add other routes as needed
+        '/dashboard': (context) => const DashboardScreen(),
+        '/article': (context) => const ArticleDetailScreen(),
+        '/weather': (context) => const WeatherScreen(),
       },
     );
   }
