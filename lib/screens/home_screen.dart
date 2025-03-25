@@ -18,13 +18,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final NewsService _newsService = NewsService();
   List<Article> _articles = [];
   bool _isLoading = true;
-  String _currentCategory = 'Local News';
-  int _currentNavIndex = 0;
+  String _currentCategory = 'All News';
+
+  // Store the source of each article for filtering
+  Map<String, String> _articleSources = {};
 
   @override
   void initState() {
     super.initState();
-    _loadNews();
+    _loadAllNews();
 
     // Use this method to ensure status bar is always white
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -38,15 +40,45 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Future<void> _loadNews() async {
+  Future<void> _loadAllNews() async {
     setState(() => _isLoading = true);
 
     try {
-      final articles = await _newsService.fetchLocalNews();
+      // Load all three feeds
+      final localNews = await _newsService.fetchLocalNews();
+      final politicsNews = await _newsService.fetchNewsByUrl(
+        'https://www.ncpoliticalnews.com/news?format=rss',
+      );
+      final sportsNews = await _newsService.fetchNewsByUrl(
+        'https://www.neusenewssports.com/news-1?format=rss',
+      );
+
       if (mounted) {
+        // Tag each article with its source
+        for (var article in localNews) {
+          _articleSources[article.link] = 'Local News';
+        }
+        for (var article in politicsNews) {
+          _articleSources[article.link] = 'NC Politics';
+        }
+        for (var article in sportsNews) {
+          _articleSources[article.link] = 'Sports';
+        }
+
+        // Combine all articles
+        List<Article> allArticles = [
+          ...localNews,
+          ...politicsNews,
+          ...sportsNews,
+        ];
+
+        // Sort by publish date (newest first)
+        allArticles.sort((a, b) => b.publishDate.compareTo(a.publishDate));
+
         setState(() {
-          _articles = articles;
+          _articles = allArticles;
           _isLoading = false;
+          _currentCategory = 'All News';
         });
       }
     } catch (e) {
@@ -61,11 +93,29 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadCategoryNews(String category, String url) async {
+  Future<void> _loadCategoryNews(String category) async {
     setState(() => _isLoading = true);
 
     try {
+      String url;
+      switch (category) {
+        case 'Local News':
+          url = 'https://www.neusenews.com/index?format=rss';
+          break;
+        case 'NC Politics':
+          url = 'https://www.ncpoliticalnews.com/news?format=rss';
+          break;
+        case 'Sports':
+          url = 'https://www.neusenewssports.com/news-1?format=rss';
+          break;
+        default:
+          // Load all feeds if "All News" selected
+          _loadAllNews();
+          return;
+      }
+
       final articles = await _newsService.fetchNewsByUrl(url);
+
       if (mounted) {
         setState(() {
           _articles = articles;
@@ -96,7 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: CircularProgressIndicator(color: Color(0xFFd2982a)),
         )
         : RefreshIndicator(
-          onRefresh: _loadNews,
+          onRefresh: _loadAllNews,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -138,15 +188,38 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
 
+              // Source indicators
+              if (_currentCategory == 'All News')
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Row(
+                    children: [
+                      _buildSourceIndicator('Local News', Colors.blue),
+                      const SizedBox(width: 12),
+                      _buildSourceIndicator('NC Politics', Colors.red),
+                      const SizedBox(width: 12),
+                      _buildSourceIndicator('Sports', Colors.green),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 8),
+
               // Article list
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.only(top: 8.0),
                   itemCount: _articles.length,
                   itemBuilder: (context, index) {
+                    final article = _articles[index];
                     return NewsCard(
-                      article: _articles[index],
-                      onReadMore: () => _onArticleTap(_articles[index]),
+                      article: article,
+                      onReadMore: () => _onArticleTap(article),
+                      // Add source indicator if showing all news
+                      sourceTag:
+                          _currentCategory == 'All News'
+                              ? _articleSources[article.link]
+                              : null,
                     );
                   },
                 ),
@@ -154,6 +227,20 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         );
+  }
+
+  Widget _buildSourceIndicator(String source, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(source, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+      ],
+    );
   }
 
   // The helper methods stay the same
@@ -164,24 +251,19 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            'News Categories',
+            'News Sources',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
+              _buildCategoryChip('All News'),
               _buildCategoryChip('Local News'),
-              _buildCategoryChip('State News'),
               _buildCategoryChip('NC Politics'),
               _buildCategoryChip('Sports'),
-              _buildCategoryChip('Columns'),
-              _buildCategoryChip('Matters of Record'),
-              _buildCategoryChip('Obituaries'),
-              _buildCategoryChip('Public Notices'),
-              _buildCategoryChip('Classifieds'),
             ],
           ),
         ],
@@ -201,10 +283,11 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       onPressed: () {
         Navigator.pop(context);
-        _loadCategoryNews(
-          category,
-          'https://www.neusenews.com/index?format=rss',
-        );
+        if (category == 'All News') {
+          _loadAllNews();
+        } else {
+          _loadCategoryNews(category);
+        }
       },
     );
   }

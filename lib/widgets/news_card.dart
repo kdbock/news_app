@@ -8,165 +8,203 @@ import 'package:news_app/screens/article_detail_screen.dart';
 
 class NewsCard extends StatelessWidget {
   final Article article;
-  final Function()? onReadMore;
+  final VoidCallback onReadMore;
+  final String? sourceTag; // Add this parameter
 
-  const NewsCard({super.key, required this.article, this.onReadMore});
-
-  void _shareArticle(Article article) {
-    Share.share(
-      '${article.title}\n\nRead more: ${article.link}',
-      subject: article.title,
-    );
-  }
-
-  // Modified to use BuildContext parameter
-  void _openArticle(BuildContext context) async {
-    if (onReadMore != null) {
-      onReadMore!();
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) =>
-                  WebViewScreen(url: article.link, title: article.title),
-        ),
-      );
-    }
-  }
-
-  // Removed unused _onArticleTap method
+  const NewsCard({
+    Key? key,
+    required this.article,
+    required this.onReadMore,
+    this.sourceTag, // Optional source tag
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 2.0,
-      margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: InkWell(
-        onTap: () => _openArticle(context), // Pass context here
-        borderRadius: BorderRadius.circular(12.0),
-        child: Column(
-          children: [
-            // Main content row - thumbnail on left, text on right
-            Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Thumbnail image on left
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8.0),
-                    child: InkWell(
-                      onTap: () => _openArticle(context), // Pass context here
-                      child: CachedNetworkImage(
-                        imageUrl: article.imageUrl,
-                        height: 90,
-                        width: 90,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias, // Ensures nothing overflows the card
+      child: Column(
+        children: [
+          // Image box with overlaid title
+          Stack(
+            children: [
+              // Featured image
+              Hero(
+                tag: 'article-${article.link}',
+                child: Image.network(
+                  article.imageUrl,
+                  height: 200,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder:
+                      (_, __, ___) => Image.asset(
+                        'assets/images/Default.jpeg',
+                        height: 200,
+                        width: double.infinity,
                         fit: BoxFit.cover,
-                        placeholder:
-                            (context, url) => Image.asset(
-                              'assets/images/Default.jpeg',
-                              height: 90,
-                              width: 90,
-                              fit: BoxFit.cover,
-                            ),
-                        errorWidget:
-                            (context, url, error) => Image.asset(
-                              'assets/images/Default.jpeg',
-                              height: 90,
-                              width: 90,
-                              fit: BoxFit.cover,
-                            ),
                       ),
-                    ),
-                  ),
+                ),
+              ),
 
-                  const SizedBox(width: 12.0), // Spacing between image and text
-                  // Content column on right
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Title (clickable)
-                        InkWell(
-                          onTap:
-                              () => _openArticle(context), // Pass context here
-                          child: Text(
-                            article.title,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2d2c31),
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-
-                        const SizedBox(height: 4.0),
-
-                        // Author and date
-                        Text(
-                          '${article.author} • ${DateFormat('MMM d, y').format(article.publishDate)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-
-                        const SizedBox(height: 4.0),
-
-                        // Excerpt
-                        Text(
-                          article.excerpt,
-                          style: const TextStyle(fontSize: 14),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+              // Title overlay (covers bottom half of image)
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.8),
+                        Colors.transparent,
                       ],
+                      stops: const [0.0, 1.0],
                     ),
                   ),
-                ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Source tag if provided (now on the image)
+                      if (sourceTag != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          margin: const EdgeInsets.only(bottom: 6),
+                          decoration: BoxDecoration(
+                            color: _getSourceColor(sourceTag!),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            sourceTag!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+
+                      // Article title on the image
+                      Text(
+                        article.title,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                      // Publication date
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          _formatDate(article.publishDate),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
+          ),
 
-            // Divider between content and actions
-            const Divider(height: 1),
-
-            // Actions row at bottom
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Share button
-                  IconButton(
-                    icon: const Icon(
-                      Icons.share,
-                      color: Color(0xFFd2982a),
-                      size: 20,
-                    ),
-                    onPressed: () => _shareArticle(article),
+          // Actions row at the bottom
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Share button
+                TextButton.icon(
+                  onPressed: () {
+                    Share.share(
+                      '${article.title}\n\nRead more: ${article.link}',
+                      subject: article.title,
+                    );
+                  },
+                  icon: const Icon(Icons.share, size: 18),
+                  label: const Text('Share'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey[700],
+                    padding: EdgeInsets.zero,
                   ),
+                ),
 
-                  // Read more button
-                  TextButton(
-                    onPressed: () => _openArticle(context), // Pass context here
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFFd2982a),
-                    ),
-                    child: const Text(
-                      "Read More",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
+                // Read More button
+                TextButton(
+                  onPressed: onReadMore,
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFd2982a),
+                    padding: EdgeInsets.zero,
                   ),
-                ],
-              ),
+                  child: const Text('READ MORE'),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+  }
+
+  // Helper method to format the date
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      if (difference.inHours == 0) {
+        return '${difference.inMinutes} min ago';
+      }
+      return '${difference.inHours} hr ago';
+    } else if (difference.inDays <= 7) {
+      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+    }
+
+    final month =
+        [
+          'Jan',
+          'Feb',
+          'Mar',
+          'Apr',
+          'May',
+          'Jun',
+          'Jul',
+          'Aug',
+          'Sep',
+          'Oct',
+          'Nov',
+          'Dec',
+        ][date.month - 1];
+
+    return '$month ${date.day}';
+  }
+
+  // Helper method to get a color for each source
+  Color _getSourceColor(String source) {
+    switch (source) {
+      case 'Local News':
+        return Colors.blue;
+      case 'NC Politics':
+        return Colors.red;
+      case 'Sports':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
   }
 }

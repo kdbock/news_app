@@ -96,4 +96,39 @@ class Article {
       categories: categories,
     );
   }
+
+  // Returns the excerpt as properly formatted paragraphs
+  String get formattedContent {
+    if (excerpt.isEmpty) return '';
+
+    // Clean up common RSS/HTML issues
+    String content =
+        excerpt
+            // Replace HTML line breaks with actual line breaks
+            .replaceAll(RegExp(r'<br\s*\/?>'), '\n')
+            // Replace multiple consecutive line breaks with double line breaks
+            .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+            // Replace HTML entities
+            .replaceAll('&nbsp;', ' ')
+            .replaceAll('&amp;', '&')
+            .replaceAll('&quot;', '"')
+            .replaceAll('&apos;', "'")
+            .replaceAll('&lt;', '<')
+            .replaceAll('&gt;', '>')
+            // Remove any remaining HTML tags
+            .replaceAll(RegExp(r'<[^>]*>'), '')
+            // Trim extra spaces
+            .replaceAll(RegExp(r'\s{2,}'), ' ')
+            .trim();
+
+    // Split into paragraphs and clean up each paragraph
+    List<String> paragraphs = content.split('\n\n');
+    paragraphs = paragraphs.map((p) => p.trim()).toList();
+
+    // Remove empty paragraphs
+    paragraphs.removeWhere((p) => p.isEmpty);
+
+    // Join with double line breaks for proper paragraph separation
+    return paragraphs.join('\n\n');
+  }
 }
