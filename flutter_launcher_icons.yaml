@@ -1,13 +1,6 @@
 flutter_launcher_icons:
-  android: "ic_launcher"
+  android: true
   ios: true
-  image_path: "assets/images/app_icon.png"  # Make sure this image exists
-  min_sdk_android: 21
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/app_icon_foreground.png"  # Create this image
-  web:
-    generate: false
-  windows:
-    generate: false
-  macos:
-    generate: false
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#d2982a"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
