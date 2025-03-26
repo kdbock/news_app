@@ -136,7 +136,7 @@ class NewsSearchDelegate extends SearchDelegate<String> {
               MaterialPageRoute(
                 builder:
                     (context) =>
-                        WebViewScreen(url: article.link, title: article.title),
+                        WebViewScreen(url: article.url, title: article.title),
               ),
             );
           },

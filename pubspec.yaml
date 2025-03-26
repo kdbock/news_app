@@ -25,10 +25,17 @@ dependencies:
   webview_flutter: ^4.4.2          # Update to the latest version instead of 3.0.4
   cloud_firestore: ^4.15.5
   firebase_storage: ^11.6.6
-  image_picker: ^1.0.7
+  image_picker: ^1.0.4
+  # file_picker: ^5.3.3
+  path_provider: ^2.1.1
+  permission_handler: ^11.0.0
   flutter_quill: ^10.5.17         # Updated version to resolve conflict
   package_info_plus: ^8.3.0       # Updated version to resolve conflict
   table_calendar: ^3.0.9
+  flutter_stripe: ^10.0.0         # Add these to your existing dependencies
+  # Add these dependencies
+  cloud_functions: ^4.5.13
+  flutter_credit_card: ^4.0.1
 
 dev_dependencies:
   flutter_test:

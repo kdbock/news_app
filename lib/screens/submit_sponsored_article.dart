@@ -16,10 +16,17 @@ class SubmitSponsoredArticleScreen extends StatefulWidget {
 class _SubmitSponsoredArticleScreenState
     extends State<SubmitSponsoredArticleScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _paymentFormKey = GlobalKey<FormState>();
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
   bool _acceptDisclosure = false;
   File? _headerImage;
+  bool _isProcessingPayment = false;
+  String? _paymentError;
+  String? _paymentIntentId;
+
+  // Fixed flat rate of $50
+  final double _articleSubmissionPrice = 50.00;
 
   // Form fields
   final _authorNameController = TextEditingController();
@@ -31,8 +38,13 @@ class _SubmitSponsoredArticleScreenState
   final _ctaLinkController = TextEditingController();
   final _ctaTextController = TextEditingController();
 
+  // Payment fields
+  final _cardNumberController = TextEditingController();
+  final _expiryDateController = TextEditingController();
+  final _cvvController = TextEditingController();
+  final _cardNameController = TextEditingController();
+
   String? _selectedCategory;
-  String _selectedDuration = '30';
 
   final List<String> _categories = [
     'Business',
@@ -44,12 +56,6 @@ class _SubmitSponsoredArticleScreenState
     'Other',
   ];
 
-  final Map<String, double> _durationPrices = {
-    '7': 99.99,
-    '30': 249.99,
-    '90': 599.99,
-  };
-
   @override
   void dispose() {
     _authorNameController.dispose();
@@ -60,6 +66,10 @@ class _SubmitSponsoredArticleScreenState
     _contentController.dispose();
     _ctaLinkController.dispose();
     _ctaTextController.dispose();
+    _cardNumberController.dispose();
+    _expiryDateController.dispose();
+    _cvvController.dispose();
+    _cardNameController.dispose();
     super.dispose();
   }
 
@@ -100,9 +110,33 @@ class _SubmitSponsoredArticleScreenState
       return;
     }
 
-    setState(() => _isLoading = true);
+    // Validate payment form
+    if (_paymentFormKey.currentState?.validate() != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please complete all payment fields')),
+      );
+      return;
+    }
+
+    // Process payment
+    setState(() {
+      _isProcessingPayment = true;
+      _paymentError = null;
+    });
 
     try {
+      // Simulate payment processing with a delay
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Generate a mock payment ID
+      _paymentIntentId =
+          'mock_payment_${DateTime.now().millisecondsSinceEpoch}';
+
+      setState(() {
+        _isProcessingPayment = false;
+        _isLoading = true;
+      });
+
       // Upload header image if selected
       String? imageUrl;
 
@@ -115,9 +149,9 @@ class _SubmitSponsoredArticleScreenState
         imageUrl = await storageRef.getDownloadURL();
       }
 
-      // Calculate expiration date
+      // Calculate expiration date (30 days)
       final now = DateTime.now();
-      final expiresAt = now.add(Duration(days: int.parse(_selectedDuration)));
+      final expiresAt = now.add(const Duration(days: 30));
 
       // Create article data
       final articleData = {
@@ -131,14 +165,16 @@ class _SubmitSponsoredArticleScreenState
         'ctaLink': _ctaLinkController.text,
         'ctaText': _ctaTextController.text,
         'headerImageUrl': imageUrl,
-        'duration': int.parse(_selectedDuration),
-        'price': _durationPrices[_selectedDuration],
+        'price': _articleSubmissionPrice,
         'isSponsored': true,
-        'publishedAt': null, // Will be set after review and payment
+        'publishedAt': null, // Will be set after review
         'expiresAt': Timestamp.fromDate(expiresAt),
         'submittedAt': FieldValue.serverTimestamp(),
         'submittedBy': FirebaseAuth.instance.currentUser?.uid ?? 'anonymous',
         'status': 'pending_review', // For editorial workflow
+        'paymentStatus': 'paid',
+        'paymentId': _paymentIntentId,
+        'paymentDate': FieldValue.serverTimestamp(),
       };
 
       // Save to Firestore
@@ -149,26 +185,92 @@ class _SubmitSponsoredArticleScreenState
       if (mounted) {
         setState(() => _isLoading = false);
 
-        // Navigate to payment screen
-        Navigator.pushReplacementNamed(
-          context,
-          '/payment',
-          arguments: {
-            'id': docRef.id,
-            'type': 'article',
-            'title': _titleController.text,
-            'amount': _durationPrices[_selectedDuration],
-          },
+        // Show confirmation dialog
+        showDialog(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text('Article Submitted'),
+                content: const Text(
+                  'Your sponsored article has been submitted and will be reviewed shortly. '
+                  'You will receive a confirmation email when your article is published.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).pop(); // Go back to previous screen
+                    },
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
         );
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isProcessingPayment = false;
+          _isLoading = false;
+          _paymentError = e.toString();
+        });
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error submitting article: $e')));
       }
     }
+  }
+
+  String? _validateCardNumber(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Card number is required';
+    }
+    // Remove spaces
+    value = value.replaceAll(' ', '');
+    if (value.length < 13 || value.length > 19) {
+      return 'Card number must be between 13-19 digits';
+    }
+    return null;
+  }
+
+  String? _validateExpiryDate(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Expiry date is required';
+    }
+    if (!RegExp(r'^\d{2}/\d{2}$').hasMatch(value)) {
+      return 'Use format MM/YY';
+    }
+
+    try {
+      final parts = value.split('/');
+      final month = int.parse(parts[0]);
+      final year = int.parse('20${parts[1]}');
+
+      final now = DateTime.now();
+      final expiryDate = DateTime(year, month + 1, 0);
+
+      if (month < 1 || month > 12) {
+        return 'Invalid month';
+      }
+
+      if (expiryDate.isBefore(now)) {
+        return 'Card has expired';
+      }
+    } catch (e) {
+      return 'Invalid date format';
+    }
+
+    return null;
+  }
+
+  String? _validateCVV(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'CVV is required';
+    }
+    if (!RegExp(r'^\d{3,4}$').hasMatch(value)) {
+      return 'CVV must be 3-4 digits';
+    }
+    return null;
   }
 
   @override
@@ -205,7 +307,7 @@ class _SubmitSponsoredArticleScreenState
                     ),
                     const SizedBox(height: 24),
 
-                    // Plans and pricing
+                    // Flat rate pricing
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -216,56 +318,26 @@ class _SubmitSponsoredArticleScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            'Sponsorship Duration',
+                            'Sponsored Article',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 8),
-
-                          // Duration selection
-                          RadioListTile<String>(
-                            title: const Text('7 Days'),
-                            subtitle: Text(
-                              '\$${_durationPrices["7"]?.toStringAsFixed(2)}',
-                            ),
-                            value: '7',
-                            groupValue: _selectedDuration,
-                            activeColor: const Color(0xFFd2982a),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedDuration = value!;
-                              });
-                            },
-                          ),
-                          RadioListTile<String>(
-                            title: const Text('30 Days'),
-                            subtitle: Text(
-                              '\$${_durationPrices["30"]?.toStringAsFixed(2)}',
-                            ),
-                            value: '30',
-                            groupValue: _selectedDuration,
-                            activeColor: const Color(0xFFd2982a),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedDuration = value!;
-                              });
-                            },
-                          ),
-                          RadioListTile<String>(
-                            title: const Text('90 Days'),
-                            subtitle: Text(
-                              '\$${_durationPrices["90"]?.toStringAsFixed(2)}',
-                            ),
-                            value: '90',
-                            groupValue: _selectedDuration,
-                            activeColor: const Color(0xFFd2982a),
-                            onChanged: (value) {
-                              setState(() {
-                                _selectedDuration = value!;
-                              });
-                            },
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('30 Days Publication'),
+                              Text(
+                                '\$${_articleSubmissionPrice.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: Color(0xFFd2982a),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -442,7 +514,7 @@ class _SubmitSponsoredArticleScreenState
                                     child: Container(
                                       padding: const EdgeInsets.all(4),
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.6),
+                                        color: Colors.black.withAlpha(153),
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(
@@ -581,6 +653,179 @@ class _SubmitSponsoredArticleScreenState
                             ),
                           ),
 
+                          const SizedBox(height: 24),
+
+                          // Payment section
+                          const Text(
+                            'Payment Information',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2d2c31),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          _isProcessingPayment
+                              ? const Center(
+                                child: Column(
+                                  children: [
+                                    CircularProgressIndicator(
+                                      color: Color(0xFFd2982a),
+                                    ),
+                                    SizedBox(height: 16),
+                                    Text('Processing payment...'),
+                                  ],
+                                ),
+                              )
+                              : _paymentError != null
+                              ? Column(
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    color: Colors.red,
+                                    size: 48,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Payment Error: $_paymentError',
+                                    style: const TextStyle(color: Colors.red),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              )
+                              : Form(
+                                key: _paymentFormKey,
+                                child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.grey),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      // Card number field
+                                      TextFormField(
+                                        controller: _cardNumberController,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Card Number',
+                                          hintText: 'XXXX XXXX XXXX XXXX',
+                                          border: OutlineInputBorder(),
+                                          suffixIcon: Icon(Icons.credit_card),
+                                        ),
+                                        keyboardType: TextInputType.number,
+                                        validator: _validateCardNumber,
+                                        onChanged: (value) {
+                                          // Auto-format card number
+                                          final text = value.replaceAll(
+                                            ' ',
+                                            '',
+                                          );
+                                          if (text.length % 4 == 0 &&
+                                              text.length < 16) {
+                                            _cardNumberController.text =
+                                                '$value ';
+                                            _cardNumberController.selection =
+                                                TextSelection.fromPosition(
+                                                  TextPosition(
+                                                    offset:
+                                                        _cardNumberController
+                                                            .text
+                                                            .length,
+                                                  ),
+                                                );
+                                          }
+                                        },
+                                      ),
+
+                                      const SizedBox(height: 16),
+
+                                      // Card details row
+                                      Row(
+                                        children: [
+                                          // Expiration date
+                                          Expanded(
+                                            child: TextFormField(
+                                              controller: _expiryDateController,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Expiry Date',
+                                                hintText: 'MM/YY',
+                                                border: OutlineInputBorder(),
+                                              ),
+                                              keyboardType:
+                                                  TextInputType.number,
+                                              validator: _validateExpiryDate,
+                                              onChanged: (value) {
+                                                // Auto-format expiry date
+                                                if (value.length == 2 &&
+                                                    !value.contains('/')) {
+                                                  _expiryDateController.text =
+                                                      '$value/';
+                                                  _expiryDateController
+                                                          .selection =
+                                                      TextSelection.fromPosition(
+                                                        TextPosition(
+                                                          offset:
+                                                              _expiryDateController
+                                                                  .text
+                                                                  .length,
+                                                        ),
+                                                      );
+                                                }
+                                              },
+                                            ),
+                                          ),
+                                          const SizedBox(width: 16),
+                                          // CVV
+                                          Expanded(
+                                            child: TextFormField(
+                                              controller: _cvvController,
+                                              decoration: const InputDecoration(
+                                                labelText: 'CVV',
+                                                hintText: 'XXX',
+                                                border: OutlineInputBorder(),
+                                              ),
+                                              keyboardType:
+                                                  TextInputType.number,
+                                              obscureText: true,
+                                              validator: _validateCVV,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+
+                                      const SizedBox(height: 16),
+
+                                      // Name on card
+                                      TextFormField(
+                                        controller: _cardNameController,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Name on Card',
+                                          border: OutlineInputBorder(),
+                                        ),
+                                        validator:
+                                            (value) =>
+                                                value!.isEmpty
+                                                    ? 'Required'
+                                                    : null,
+                                      ),
+
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'By submitting, you agree to our terms and conditions.',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+
                           const SizedBox(height: 32),
 
                           // Submit button
@@ -596,7 +841,7 @@ class _SubmitSponsoredArticleScreenState
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
-                              child: const Text('CONTINUE TO PAYMENT'),
+                              child: const Text('SUBMIT & PAY \$50.00'),
                             ),
                           ),
                         ],

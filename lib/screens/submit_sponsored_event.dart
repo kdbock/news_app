@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
+// Remove the cloud_functions import for now
+// import 'package:cloud_functions/cloud_functions.dart';
 
 class SubmitSponsoredEventScreen extends StatefulWidget {
   const SubmitSponsoredEventScreen({super.key});
@@ -14,10 +18,11 @@ class SubmitSponsoredEventScreen extends StatefulWidget {
 class _SubmitSponsoredEventScreenState
     extends State<SubmitSponsoredEventScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _paymentFormKey = GlobalKey<FormState>();
   bool _isLoading = false;
   int _currentStep = 0;
-  String? _selectedTier;
-  final List<String> _eventImages = [];
+  final List<XFile> _eventImages = <XFile>[];
+  final ImagePicker _imagePicker = ImagePicker();
 
   // Form fields
   final _organizationController = TextEditingController();
@@ -32,6 +37,12 @@ class _SubmitSponsoredEventScreenState
   final _ticketLinkController = TextEditingController();
   final _hashtagsController = TextEditingController();
   final _ageRestrictionsController = TextEditingController();
+
+  // Payment fields
+  final _cardNumberController = TextEditingController();
+  final _expiryDateController = TextEditingController();
+  final _cvvController = TextEditingController();
+  final _cardNameController = TextEditingController();
 
   DateTime? _startDate;
   TimeOfDay? _startTime;
@@ -51,12 +62,12 @@ class _SubmitSponsoredEventScreenState
   ];
 
   String? _selectedEventType;
+  // Fixed price of $25 instead of tiers
+  final double _eventSubmissionPrice = 25.00;
 
-  final Map<String, double> _sponsorshipTiers = {
-    'Basic (1-day promotion)': 49.99,
-    'Featured (3-day promotion)': 99.99,
-    'Premium (7-day promotion)': 199.99,
-  };
+  bool _isProcessingPayment = false;
+  String? _paymentError;
+  String? _paymentIntentId;
 
   @override
   void dispose() {
@@ -72,6 +83,10 @@ class _SubmitSponsoredEventScreenState
     _ticketLinkController.dispose();
     _hashtagsController.dispose();
     _ageRestrictionsController.dispose();
+    _cardNumberController.dispose();
+    _expiryDateController.dispose();
+    _cvvController.dispose();
+    _cardNameController.dispose();
     super.dispose();
   }
 
@@ -114,16 +129,89 @@ class _SubmitSponsoredEventScreenState
   }
 
   Future<void> _pickEventImage() async {
-    // Placeholder for image picker functionality
-    setState(() {
-      // Mock adding an image
-      if (_eventImages.length < 5) {
-        _eventImages.add('event_image_${_eventImages.length + 1}.jpg');
+    // Show options in a bottom sheet
+    if (mounted) {
+      showModalBottomSheet(
+        context: context,
+        builder:
+            (context) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.photo_library),
+                    title: const Text('Photo Gallery'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickFromGallery();
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.photo_camera),
+                    title: const Text('Camera'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickFromCamera();
+                    },
+                  ),
+                ],
+              ),
+            ),
+      );
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    try {
+      final List<XFile> selectedImages = await _imagePicker.pickMultiImage(
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
+      );
+
+      if (selectedImages.isNotEmpty && mounted) {
+        setState(() {
+          // Only allow one image for events
+          _eventImages.clear();
+          _eventImages.add(selectedImages.first);
+        });
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+      }
+    }
+  }
+
+  Future<void> _pickFromCamera() async {
+    try {
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
+      );
+
+      if (photo != null && mounted) {
+        setState(() {
+          // Replace any existing image
+          _eventImages.clear();
+          _eventImages.add(photo);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error taking photo: $e')));
+      }
+    }
   }
 
   Future<void> _submitEvent() async {
+    // Validate main form
     if (_formKey.currentState?.validate() != true) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields')),
@@ -131,21 +219,36 @@ class _SubmitSponsoredEventScreenState
       return;
     }
 
-    if (_selectedTier == null) {
+    // Validate payment form
+    if (_paymentFormKey.currentState?.validate() != true) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a sponsorship tier')),
+        const SnackBar(content: Text('Please complete all payment fields')),
       );
       return;
     }
 
-    setState(() => _isLoading = true);
+    // Process payment
+    setState(() {
+      _isProcessingPayment = true;
+      _paymentError = null;
+    });
 
     try {
-      // Save event to Firestore
-      await _saveEventToFirestore();
-
       // Simulate payment processing with a delay
-      await Future.delayed(const Duration(seconds: 1));
+      await Future.delayed(const Duration(seconds: 2));
+
+      // Generate a mock payment ID
+      _paymentIntentId =
+          'mock_payment_${DateTime.now().millisecondsSinceEpoch}';
+
+      // Now save the event
+      setState(() {
+        _isProcessingPayment = false;
+        _isLoading = true;
+      });
+
+      // Save event to Firestore
+      final String eventId = await _saveEventToFirestore();
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -156,7 +259,7 @@ class _SubmitSponsoredEventScreenState
               (context) => AlertDialog(
                 title: const Text('Event Submitted'),
                 content: const Text(
-                  'Your sponsored event has been submitted and will be reviewed shortly. '
+                  'Your community event has been submitted and will be reviewed shortly. '
                   'You will receive a confirmation email with details about your listing.',
                 ),
                 actions: [
@@ -173,7 +276,12 @@ class _SubmitSponsoredEventScreenState
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isProcessingPayment = false;
+          _isLoading = false;
+          _paymentError = e.toString();
+        });
+
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error submitting event: $e')));
@@ -181,8 +289,8 @@ class _SubmitSponsoredEventScreenState
     }
   }
 
-  Future<void> _saveEventToFirestore() async {
-    if (_startDate == null) return;
+  Future<String> _saveEventToFirestore() async {
+    if (_startDate == null) throw Exception('Start date is required');
 
     // Create a DateTime object with date and time combined
     final DateTime eventDateTime = DateTime(
@@ -194,26 +302,18 @@ class _SubmitSponsoredEventScreenState
     // Format times for display
     final String formattedStartTime =
         _startTime != null ? _startTime!.format(context) : '12:00 PM';
-
-    final String? formattedEndTime =
-        _endTime?.format(context);
-
-    // Determine sponsorship tier duration
-    int promotionDays = 1;
-    if (_selectedTier == 'Featured (3-day promotion)') {
-      promotionDays = 3;
-    } else if (_selectedTier == 'Premium (7-day promotion)') {
-      promotionDays = 7;
-    }
-
-    // Calculate promotion end date
-    final DateTime promotionEndDate = DateTime.now().add(
-      Duration(days: promotionDays),
-    );
+    final String? formattedEndTime = _endTime?.format(context);
 
     try {
+      String? imageUrl;
+      if (_eventImages.isNotEmpty) {
+        // For now, just note that we have an image
+        // In a real app, upload to Firebase Storage here
+        imageUrl = 'placeholder_for_uploaded_image';
+      }
+
       // Create the event document in Firestore
-      await FirebaseFirestore.instance.collection('events').add({
+      final docRef = await FirebaseFirestore.instance.collection('events').add({
         'title': _eventTitleController.text,
         'description': _descriptionController.text,
         'location': '${_venueController.text}, ${_addressController.text}',
@@ -226,8 +326,10 @@ class _SubmitSponsoredEventScreenState
         'contactPhone': _phoneController.text,
         'eventType': _selectedEventType,
         'isSponsored': true,
-        'sponsorshipTier': _selectedTier,
-        'promotionEndDate': Timestamp.fromDate(promotionEndDate),
+        'submissionFee': _eventSubmissionPrice,
+        'paymentStatus': 'paid', // Mark as paid
+        'paymentId': _paymentIntentId,
+        'paymentDate': FieldValue.serverTimestamp(),
         'ticketLink':
             _ticketLinkController.text.isEmpty
                 ? null
@@ -237,17 +339,72 @@ class _SubmitSponsoredEventScreenState
         'rainDate': _rainDate != null ? Timestamp.fromDate(_rainDate!) : null,
         'createdAt': FieldValue.serverTimestamp(),
         'createdBy': FirebaseAuth.instance.currentUser?.uid,
+        'imageUrl': imageUrl,
       });
+
+      return docRef.id;
     } catch (e) {
-      rethrow; // Pass the error up to be handled by the calling function
+      rethrow;
     }
+  }
+
+  String? _validateCardNumber(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Card number is required';
+    }
+    // Remove spaces
+    value = value.replaceAll(' ', '');
+    if (value.length < 13 || value.length > 19) {
+      return 'Card number must be between 13-19 digits';
+    }
+    return null;
+  }
+
+  String? _validateExpiryDate(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Expiry date is required';
+    }
+    if (!RegExp(r'^\d{2}/\d{2}$').hasMatch(value)) {
+      return 'Use format MM/YY';
+    }
+
+    try {
+      final parts = value.split('/');
+      final month = int.parse(parts[0]);
+      final year = int.parse('20${parts[1]}');
+
+      final now = DateTime.now();
+      final expiryDate = DateTime(year, month + 1, 0);
+
+      if (month < 1 || month > 12) {
+        return 'Invalid month';
+      }
+
+      if (expiryDate.isBefore(now)) {
+        return 'Card has expired';
+      }
+    } catch (e) {
+      return 'Invalid date format';
+    }
+
+    return null;
+  }
+
+  String? _validateCVV(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'CVV is required';
+    }
+    if (!RegExp(r'^\d{3,4}$').hasMatch(value)) {
+      return 'CVV must be 3-4 digits';
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Submit Sponsored Event'),
+        title: const Text('Submit Community Event'),
         backgroundColor: Colors.white,
         foregroundColor: const Color(0xFF2d2c31),
         elevation: 1,
@@ -293,6 +450,7 @@ class _SubmitSponsoredEventScreenState
                     );
                   },
                   steps: [
+                    // Organization Info step
                     Step(
                       title: const Text('Organization Info'),
                       isActive: _currentStep >= 0,
@@ -352,6 +510,8 @@ class _SubmitSponsoredEventScreenState
                         ],
                       ),
                     ),
+
+                    // Event Details step
                     Step(
                       title: const Text('Event Details'),
                       isActive: _currentStep >= 1,
@@ -545,6 +705,8 @@ class _SubmitSponsoredEventScreenState
                         ],
                       ),
                     ),
+
+                    // Additional Info step
                     Step(
                       title: const Text('Additional Info'),
                       isActive: _currentStep >= 2,
@@ -637,62 +799,68 @@ class _SubmitSponsoredEventScreenState
                           ),
                           const SizedBox(height: 8),
 
+                          // Event Image Preview
                           if (_eventImages.isNotEmpty)
                             Container(
-                              height: 100,
+                              height: 150,
                               margin: const EdgeInsets.only(bottom: 16),
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _eventImages.length,
-                                itemBuilder: (context, index) {
-                                  return Stack(
-                                    children: [
-                                      Container(
-                                        width: 100,
-                                        height: 100,
-                                        margin: const EdgeInsets.only(right: 8),
+                              child: Stack(
+                                children: [
+                                  Container(
+                                    width: double.infinity,
+                                    height: 150,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.grey),
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(
+                                        File(_eventImages.first.path),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (
+                                          context,
+                                          error,
+                                          stackTrace,
+                                        ) {
+                                          debugPrint(
+                                            'Error loading image: $error',
+                                          );
+                                          return const Center(
+                                            child: Icon(
+                                              Icons.broken_image,
+                                              color: Colors.grey,
+                                              size: 40,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setState(() {
+                                          _eventImages.clear();
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(4),
                                         decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          color: Colors.grey[200],
+                                          color: Colors.black.withAlpha(153),
+                                          shape: BoxShape.circle,
                                         ),
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.event,
-                                            size: 40,
-                                            color: Colors.grey,
-                                          ),
+                                        child: const Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                          size: 16,
                                         ),
                                       ),
-                                      Positioned(
-                                        top: 0,
-                                        right: 8,
-                                        child: GestureDetector(
-                                          onTap: () {
-                                            setState(() {
-                                              _eventImages.removeAt(index);
-                                            });
-                                          },
-                                          child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            decoration: BoxDecoration(
-                                              color: Colors.black.withOpacity(
-                                                0.6,
-                                              ),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 16,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
 
@@ -709,40 +877,281 @@ class _SubmitSponsoredEventScreenState
                         ],
                       ),
                     ),
-                    Step(
-                      title: const Text('Sponsorship & Payment'),
-                      isActive: _currentStep >= 3,
-                      content: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Select Sponsorship Tier',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Choose how long you want your event to be promoted',
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
-                          ),
-                          const SizedBox(height: 16),
 
-                          ..._sponsorshipTiers.entries.map((entry) {
-                            return RadioListTile<String>(
-                              title: Text(entry.key),
-                              value: entry.key,
-                              groupValue: _selectedTier,
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedTier = value;
-                                });
-                              },
-                            );
-                          }),
-                        ],
-                      ),
+                    // Payment step
+                    Step(
+                      title: const Text('Payment'),
+                      isActive: _currentStep >= 3,
+                      content:
+                          _isProcessingPayment
+                              ? const Center(
+                                child: Column(
+                                  children: [
+                                    CircularProgressIndicator(
+                                      color: Color(0xFFd2982a),
+                                    ),
+                                    SizedBox(height: 16),
+                                    Text('Processing payment...'),
+                                  ],
+                                ),
+                              )
+                              : _paymentError != null
+                              ? Column(
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    color: Colors.red,
+                                    size: 48,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Payment Error: $_paymentError',
+                                    style: const TextStyle(color: Colors.red),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 24),
+                                  ElevatedButton(
+                                    onPressed: _submitEvent,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFd2982a),
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text('TRY AGAIN'),
+                                  ),
+                                ],
+                              )
+                              : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Community Event Submission',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'Your event will be listed in our community calendar after review.',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Colors.grey[300]!,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Payment Summary',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text('Event Listing Fee'),
+                                            Text(
+                                              '\$${_eventSubmissionPrice.toStringAsFixed(2)}',
+                                            ),
+                                          ],
+                                        ),
+                                        const Divider(height: 24),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const Text(
+                                              'Total',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            Text(
+                                              '\$${_eventSubmissionPrice.toStringAsFixed(2)}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                                color: Color(0xFFd2982a),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  Form(
+                                    key: _paymentFormKey,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.grey),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Payment Information',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 16),
+
+                                          // Card number field
+                                          TextFormField(
+                                            controller: _cardNumberController,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Card Number',
+                                              hintText: 'XXXX XXXX XXXX XXXX',
+                                              border: OutlineInputBorder(),
+                                              suffixIcon: Icon(
+                                                Icons.credit_card,
+                                              ),
+                                            ),
+                                            keyboardType: TextInputType.number,
+                                            validator: _validateCardNumber,
+                                            onChanged: (value) {
+                                              // Auto-format card number
+                                              final text = value.replaceAll(
+                                                ' ',
+                                                '',
+                                              );
+                                              if (text.length % 4 == 0 &&
+                                                  text.length < 16) {
+                                                _cardNumberController.text =
+                                                    '$value ';
+                                                _cardNumberController
+                                                        .selection =
+                                                    TextSelection.fromPosition(
+                                                      TextPosition(
+                                                        offset:
+                                                            _cardNumberController
+                                                                .text
+                                                                .length,
+                                                      ),
+                                                    );
+                                              }
+                                            },
+                                          ),
+
+                                          const SizedBox(height: 16),
+
+                                          // Card details row
+                                          Row(
+                                            children: [
+                                              // Expiration date
+                                              Expanded(
+                                                child: TextFormField(
+                                                  controller:
+                                                      _expiryDateController,
+                                                  decoration:
+                                                      const InputDecoration(
+                                                        labelText:
+                                                            'Expiry Date',
+                                                        hintText: 'MM/YY',
+                                                        border:
+                                                            OutlineInputBorder(),
+                                                      ),
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  validator:
+                                                      _validateExpiryDate,
+                                                  onChanged: (value) {
+                                                    // Auto-format expiry date
+                                                    if (value.length == 2 &&
+                                                        !value.contains('/')) {
+                                                      _expiryDateController
+                                                          .text = '$value/';
+                                                      _expiryDateController
+                                                              .selection =
+                                                          TextSelection.fromPosition(
+                                                            TextPosition(
+                                                              offset:
+                                                                  _expiryDateController
+                                                                      .text
+                                                                      .length,
+                                                            ),
+                                                          );
+                                                    }
+                                                  },
+                                                ),
+                                              ),
+                                              const SizedBox(width: 16),
+                                              // CVV
+                                              Expanded(
+                                                child: TextFormField(
+                                                  controller: _cvvController,
+                                                  decoration:
+                                                      const InputDecoration(
+                                                        labelText: 'CVV',
+                                                        hintText: 'XXX',
+                                                        border:
+                                                            OutlineInputBorder(),
+                                                      ),
+                                                  keyboardType:
+                                                      TextInputType.number,
+                                                  obscureText: true,
+                                                  validator: _validateCVV,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+
+                                          const SizedBox(height: 16),
+
+                                          // Name on card
+                                          TextFormField(
+                                            controller: _cardNameController,
+                                            decoration: const InputDecoration(
+                                              labelText: 'Name on Card',
+                                              border: OutlineInputBorder(),
+                                            ),
+                                            validator:
+                                                (value) =>
+                                                    value!.isEmpty
+                                                        ? 'Required'
+                                                        : null,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'By submitting, you agree to our terms and conditions.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Payment will be processed securely. You will receive a confirmation email after submission.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
+                              ),
                     ),
                   ],
                 ),

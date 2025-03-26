@@ -7,8 +7,9 @@ import 'package:news_app/models/weather_forecast.dart' as weather_forecast;
 import 'package:news_app/screens/weather_screen.dart';
 import 'package:news_app/screens/home_screen.dart';
 import 'package:news_app/widgets/news_search_delegate.dart'
-    as news_search_delegate; // Add this import
+    as news_search_delegate;
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Add this import
 import 'package:news_app/screens/local_news_screen.dart';
 import 'package:news_app/screens/politics_screen.dart';
 import 'package:news_app/screens/sports_screen.dart';
@@ -24,7 +25,6 @@ import 'package:news_app/screens/edit_profile_screen.dart';
 import 'package:news_app/screens/settings_screen.dart';
 import 'package:news_app/screens/calendar_screen.dart';
 import 'package:news_app/models/event.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:news_app/services/event_service.dart';
 import 'package:news_app/widgets/webview_screen.dart';
@@ -49,6 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Article> _politicsNews = [];
   List<weather_forecast.WeatherForecast> _forecasts = [];
   List<Event> _upcomingEvents = [];
+  List<Article> _sponsoredArticles = []; // Add this line
   bool _isLoading = true;
 
   // Add selected tab index
@@ -56,6 +57,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // PageController to manage the tab content
   late PageController _pageController;
+
+  // Add these scroll controllers for jump links
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _sectionKeys = {
+    'latestNews': GlobalKey(),
+    'weather': GlobalKey(),
+    'sponsoredEvents': GlobalKey(),
+    'sponsoredArticles': GlobalKey(),
+    'sports': GlobalKey(),
+    'politics': GlobalKey(),
+    'columns': GlobalKey(),
+    'classifieds': GlobalKey(),
+    'obituaries': GlobalKey(),
+    'publicNotices': GlobalKey(),
+  };
 
   @override
   void initState() {
@@ -66,6 +82,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _pageController.dispose();
     super.dispose();
   }
@@ -87,6 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
         _weatherService.getForecast(),
         _eventService.getUpcomingEvents(), // Use EventService here
+        _fetchSponsoredArticles(), // Add this line
       ]);
 
       if (mounted) {
@@ -101,14 +119,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _politicsNews = results[6] as List<Article>;
           _forecasts = results[7] as List<weather_forecast.WeatherForecast>;
           _upcomingEvents = results[8] as List<Event>;
+          _sponsoredArticles = results[9] as List<Article>; // Add this line
           _isLoading = false;
         });
 
+        // Update debug print to include sponsored articles
         debugPrint(
           'Loaded feeds - Local: ${_localNews.length}, Sports: ${_sportsNews.length}, '
           'Politics: ${_politicsNews.length}, '
           'Columns: ${_columnsNews.length}, Classifieds: ${_classifiedsNews.length}, '
           'Obituaries: ${_obituariesNews.length}, Public Notices: ${_publicNoticesNews.length}, '
+          'Sponsored Articles: ${_sponsoredArticles.length}, '
           'Weather Forecasts: ${_forecasts.length}, '
           'Upcoming Events: ${_upcomingEvents.length}',
         );
@@ -122,6 +143,113 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
       }
     }
+  }
+
+  // Add this method to fetch sponsored articles
+  Future<List<Article>> _fetchSponsoredArticles() async {
+    try {
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('sponsored_articles')
+              .where('status', isEqualTo: 'published')
+              .where('publishedAt', isLessThan: DateTime.now())
+              .where('expiresAt', isGreaterThan: DateTime.now())
+              .orderBy('publishedAt', descending: true)
+              .limit(10)
+              .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return Article(
+          id: doc.id,
+          title: data['title'] ?? '',
+          excerpt:
+              data['content'] != null && data['content'].length > 150
+                  ? '${data['content'].substring(0, 150)}...'
+                  : data['content'] ??
+                      '', // Replace 'description' with 'excerpt'
+          imageUrl: data['headerImageUrl'],
+          publishDate: data['publishedAt']?.toDate() ?? DateTime.now(),
+          author: data['authorName'] ?? '',
+          url: data['ctaLink'] ?? '',
+          linkText: data['ctaText'] ?? 'Read More',
+          isSponsored: true,
+          source: data['companyName'] ?? 'Sponsored',
+          content: data['content'] ?? '',
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('Error fetching sponsored articles: $e');
+      return [];
+    }
+  }
+
+  // Add method to scroll to section
+  void _scrollToSection(String section) {
+    final key = _sectionKeys[section];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  // Add this method below the _scrollToSection method
+  Widget _buildJumpLinks() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+          child: Row(
+            children: [
+              _buildJumpLink('Latest', 'latestNews'),
+              _buildJumpLink('Weather', 'weather'),
+              _buildJumpLink('Events', 'sponsoredEvents'),
+              _buildJumpLink('Sponsored', 'sponsoredArticles'),
+              _buildJumpLink('Sports', 'sports'),
+              _buildJumpLink('Politics', 'politics'),
+              _buildJumpLink('Columns', 'columns'),
+              _buildJumpLink('Classifieds', 'classifieds'),
+              _buildJumpLink('Obituaries', 'obituaries'),
+              _buildJumpLink('Notices', 'publicNotices'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Add this method right after the _buildJumpLinks method
+  Widget _buildJumpLink(String label, String section) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+      child: ActionChip(
+        backgroundColor: Colors.white,
+        side: const BorderSide(color: Color(0xFFd2982a)),
+        label: Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFFd2982a),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        onPressed: () => _scrollToSection(section),
+      ),
+    );
   }
 
   // Rest of your existing methods...
@@ -228,9 +356,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return RefreshIndicator(
       onRefresh: _loadDashboardData,
       child: SingleChildScrollView(
+        controller: _scrollController,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Add jump links at the top
+            _buildJumpLinks(),
+
+            // Latest News section
+            Container(key: _sectionKeys['latestNews']),
             _buildSectionHeader(
               'Latest News',
               onSeeAllPressed: () {
@@ -244,6 +378,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             _buildNewsSlider(_localNews),
 
+            // Weather section
+            Container(key: _sectionKeys['weather']),
             _buildSectionHeader(
               'This Week\'s Weather',
               onSeeAllPressed: () {
@@ -255,7 +391,44 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             _buildWeatherPreview(),
 
+            // Sponsored Events section
+            Container(key: _sectionKeys['sponsoredEvents']),
+            _buildSectionHeader(
+              'Sponsored Events',
+              onSeeAllPressed: () {
+                setState(() {
+                  _selectedIndex = 3; // Switch to calendar tab
+                  _pageController.jumpToPage(3);
+                });
+              },
+            ),
+            _buildEventSlider(
+              _upcomingEvents.where((e) => e.isSponsored).toList(),
+            ),
+
+            // Sponsored Articles section - NEW
+            Container(key: _sectionKeys['sponsoredArticles']),
+            _buildSectionHeader(
+              'Sponsored Articles',
+              onSeeAllPressed: () {
+                // Navigate to a dedicated sponsored articles screen
+                // This would need to be implemented
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => const WebViewScreen(
+                          url: 'https://www.neusenews.com/sponsored',
+                          title: 'Sponsored Content',
+                        ),
+                  ),
+                );
+              },
+            ),
+            _buildNewsSlider(_sponsoredArticles),
+
             // Sports News section
+            Container(key: _sectionKeys['sports']),
             _buildSectionHeader(
               'Sports',
               onSeeAllPressed: () {
@@ -267,19 +440,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             _buildNewsSlider(_sportsNews),
 
-            // Add the Events section here
-            _buildSectionHeader(
-              'Upcoming Events',
-              onSeeAllPressed: () {
-                setState(() {
-                  _selectedIndex = 3; // Switch to calendar tab
-                  _pageController.jumpToPage(3);
-                });
-              },
-            ),
-            _buildEventSlider(_upcomingEvents),
-
             // Politics News section
+            Container(key: _sectionKeys['politics']),
             _buildSectionHeader(
               'NC Politics',
               onSeeAllPressed: () {
@@ -294,6 +456,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildNewsSlider(_politicsNews),
 
             // Columns News section
+            Container(key: _sectionKeys['columns']),
             _buildSectionHeader(
               'Columns',
               onSeeAllPressed: () {
@@ -308,6 +471,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildNewsSlider(_columnsNews),
 
             // Classifieds News section
+            Container(key: _sectionKeys['classifieds']),
             _buildSectionHeader(
               'Classifieds',
               onSeeAllPressed: () {
@@ -322,6 +486,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildNewsSlider(_classifiedsNews),
 
             // Obituaries News section
+            Container(key: _sectionKeys['obituaries']),
             _buildSectionHeader(
               'Obituaries',
               onSeeAllPressed: () {
@@ -336,6 +501,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildNewsSlider(_obituariesNews),
 
             // Public Notices News section
+            Container(key: _sectionKeys['publicNotices']),
             _buildSectionHeader(
               'Public Notices',
               onSeeAllPressed: () {
@@ -368,11 +534,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 itemCount: articles.length,
                 itemBuilder: (context, index) {
+                  final article = articles[index];
                   return Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: NewsCardMini(
-                      article: articles[index],
-                      onTap: () => _openArticle(articles[index]),
+                    child: Stack(
+                      children: [
+                        NewsCardMini(
+                          article: article,
+                          onTap: () => _openArticle(article),
+                        ),
+                        // Show sponsored badge if article is sponsored
+                        if (article.isSponsored)
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFd2982a),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'SPONSORED',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 },

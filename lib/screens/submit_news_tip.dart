@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class SubmitNewsTipScreen extends StatefulWidget {
   const SubmitNewsTipScreen({super.key});
@@ -12,7 +15,10 @@ class _SubmitNewsTipScreenState extends State<SubmitNewsTipScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _isAnonymous = false;
-  final List<String> _mediaFiles = [];
+
+  // Change the type to store actual XFile objects instead of just strings
+  final List<XFile> _mediaFiles = <XFile>[];
+  final ImagePicker _imagePicker = ImagePicker();
 
   // Form fields
   final _nameController = TextEditingController();
@@ -48,15 +54,126 @@ class _SubmitNewsTipScreenState extends State<SubmitNewsTipScreen> {
   }
 
   Future<void> _pickMedia() async {
-    // Placeholder for image picker functionality
-    setState(() {
-      // Mock adding a media file
-      if (_mediaFiles.length < 3) {
-        _mediaFiles.add('media_${_mediaFiles.length + 1}.jpg');
+    // Request permissions first
+    final PermissionStatus photoStatus = await Permission.photos.request();
+
+    if (photoStatus.isDenied) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo permission is required to upload images'),
+          ),
+        );
       }
+      return;
+    }
+
+    // Show options in a bottom sheet
+    if (mounted) {
+      showModalBottomSheet(
+        context: context,
+        builder:
+            (context) => SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.photo_library),
+                    title: const Text('Photo Gallery'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickFromGallery();
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.photo_camera),
+                    title: const Text('Camera'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _pickFromCamera();
+                    },
+                  ),
+                ],
+              ),
+            ),
+      );
+    }
+  }
+
+  Future<void> _pickFromGallery() async {
+    try {
+      final List<XFile> selectedImages = await _imagePicker.pickMultiImage(
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
+      );
+
+      if (selectedImages.isNotEmpty && mounted) {
+        final int remainingSlots = 3 - _mediaFiles.length;
+        setState(() {
+          // Add new images, respecting the 3 file limit
+          if (remainingSlots > 0) {
+            _mediaFiles.addAll(selectedImages.take(remainingSlots));
+          }
+        });
+
+        if (selectedImages.length > remainingSlots) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Maximum of 3 files allowed. Extra files were not added.',
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking images: $e')));
+      }
+    }
+  }
+
+  Future<void> _pickFromCamera() async {
+    try {
+      if (_mediaFiles.length >= 3) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Maximum of 3 files allowed')),
+        );
+        return;
+      }
+
+      final XFile? photo = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 80,
+      );
+
+      if (photo != null && mounted) {
+        setState(() {
+          _mediaFiles.add(photo);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error taking photo: $e')));
+      }
+    }
+  }
+
+  // Add this helper method to reset media files if needed
+  void _resetMediaFiles() {
+    setState(() {
+      _mediaFiles.clear();
     });
   }
 
+  // Update _submitTip to handle the image files
   Future<void> _submitTip() async {
     if (_formKey.currentState?.validate() != true) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -72,10 +189,30 @@ class _SubmitNewsTipScreenState extends State<SubmitNewsTipScreen> {
       return;
     }
 
+    if (_incidentDate == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Please select a date')));
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      // Simulate submission with a delay
+      // Here you would upload the images to your server/storage
+      // For now, we'll simulate the upload with a delay
+
+      // Example of how to access the files
+      for (final XFile media in _mediaFiles) {
+        // Read file as bytes
+        final File file = File(media.path);
+        // final Uint8List bytes = await file.readAsBytes();
+
+        // Here you would upload the bytes to your server or cloud storage
+        // For now, just print the file name
+        debugPrint('Would upload: ${media.name} (${file.lengthSync()} bytes)');
+      }
+
       await Future.delayed(const Duration(seconds: 2));
 
       if (mounted) {
@@ -165,7 +302,7 @@ class _SubmitNewsTipScreenState extends State<SubmitNewsTipScreen> {
                           SwitchListTile(
                             title: const Text('Submit Anonymously'),
                             subtitle: const Text(
-                              'We\'ll keep your identity private',
+                              'We will make every attemot to keep your identity private',
                               style: TextStyle(fontSize: 12),
                             ),
                             value: _isAnonymous,
@@ -433,6 +570,7 @@ class _SubmitNewsTipScreenState extends State<SubmitNewsTipScreen> {
                                 scrollDirection: Axis.horizontal,
                                 itemCount: _mediaFiles.length,
                                 itemBuilder: (context, index) {
+                                  final XFile mediaFile = _mediaFiles[index];
                                   return Stack(
                                     children: [
                                       Container(
@@ -443,13 +581,32 @@ class _SubmitNewsTipScreenState extends State<SubmitNewsTipScreen> {
                                           borderRadius: BorderRadius.circular(
                                             8,
                                           ),
-                                          color: Colors.grey[200],
-                                        ),
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.photo,
-                                            size: 40,
+                                          border: Border.all(
                                             color: Colors.grey,
+                                          ),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          child: Image.file(
+                                            File(mediaFile.path),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (
+                                              context,
+                                              error,
+                                              stackTrace,
+                                            ) {
+                                              debugPrint(
+                                                'Error loading image: $error',
+                                              );
+                                              return const Center(
+                                                child: Icon(
+                                                  Icons.broken_image,
+                                                  color: Colors.grey,
+                                                ),
+                                              );
+                                            },
                                           ),
                                         ),
                                       ),

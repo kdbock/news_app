@@ -26,6 +26,8 @@ android {
     defaultConfig {
         applicationId = "com.wordnerd.neusenews"
         minSdk = 23 // Minimum for Firebase
+        // Remove or comment out the minSdkVersion line as it's redundant with minSdk
+        // minSdkVersion(21) // This is the correct function syntax if you need it
         targetSdk = 35  // Updated to match compileSdk
         versionCode = flutter.versionCode
         versionName = flutter.versionName

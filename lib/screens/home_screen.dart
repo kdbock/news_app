@@ -55,13 +55,15 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         // Tag each article with its source
         for (var article in localNews) {
-          _articleSources[article.link] = 'Local News';
+          _articleSources[article.url] =
+              'Local News'; // Changed from article.link
         }
         for (var article in politicsNews) {
-          _articleSources[article.link] = 'NC Politics';
+          _articleSources[article.url] =
+              'NC Politics'; // Changed from article.link
         }
         for (var article in sportsNews) {
-          _articleSources[article.link] = 'Sports';
+          _articleSources[article.url] = 'Sports'; // Changed from article.link
         }
 
         // Combine all articles
@@ -217,7 +219,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       // Add source indicator if showing all news
                       sourceTag:
                           _currentCategory == 'All News'
-                              ? _articleSources[article.link]
+                              ? _articleSources[article
+                                  .url] // Changed from article.link
                               : null,
                     );
                   },

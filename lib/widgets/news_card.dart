@@ -28,7 +28,7 @@ class NewsCard extends StatelessWidget {
             children: [
               // Featured image
               Hero(
-                tag: 'article-${article.link}',
+                tag: 'article-${article.url}', // Changed from article.link
                 child: Image.network(
                   article.imageUrl,
                   height: 200,
@@ -56,7 +56,9 @@ class NewsCard extends StatelessWidget {
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
                       colors: [
-                        Colors.black.withOpacity(0.8),
+                        Colors.black.withAlpha(
+                          204,
+                        ), // Changed from withOpacity(0.8)
                         Colors.transparent,
                       ],
                       stops: const [0.0, 1.0],
@@ -128,7 +130,7 @@ class NewsCard extends StatelessWidget {
                 TextButton.icon(
                   onPressed: () {
                     Share.share(
-                      '${article.title}\n\nRead more: ${article.link}',
+                      '${article.title}\n\nRead more: ${article.url}', // Changed from article.link
                       subject: article.title,
                     );
                   },

@@ -1,9 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Add these permission lines -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    
+    <!-- For image_picker and permission_handler -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    
+    <!-- For Android 12 and lower -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    
+    <!-- For Android 13 and higher -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    
     <application
         android:label="Hyper Local News"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:enableOnBackInvokedCallback="true">
+        android:enableOnBackInvokedCallback="true"
+        android:requestLegacyExternalStorage="true"> <!-- Add this line for storage access -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

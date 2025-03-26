@@ -17,6 +17,7 @@ import 'package:news_app/screens/public_notices_screen.dart';
 import 'package:news_app/screens/classifieds_screen.dart';
 import 'package:news_app/screens/profile_screen.dart';
 import 'package:news_app/screens/edit_profile_screen.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,10 @@ void main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
+
+  // Set up the Stripe publishable key
+  Stripe.publishableKey = 'pk_live_51QpJ6iAO5ulTKoALLtQFut6aQIyhLvrcUWRgA8RINvB6xwa37NeKymcV5lM96Yg6oOXvMQuwjPzP5LbE6I5ktHWG00Xk24gmn2';
+  await Stripe.instance.applySettings();
 
   runApp(const MyApp());
 }

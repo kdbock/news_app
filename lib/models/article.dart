@@ -1,22 +1,37 @@
-import 'package:intl/intl.dart'; // Make sure to add this import
+import 'package:intl/intl.dart';
 
 class Article {
+  final String id;
   final String title;
   final String author;
   final DateTime publishDate;
   final String imageUrl;
-  final String link;
-  final String excerpt;
+  final String url; // renamed from 'link' for clarity
+  final String content; // full content (for sponsored articles)
+  final String excerpt; // short description (used for previews)
   final List<String> categories;
+  final bool isSponsored; // flag for sponsored content
+  final String linkText; // custom text for CTA button
+  final String
+  source; // source name (e.g., company name for sponsored articles)
+
+  // Add a getter for backward compatibility
+  String get link =>
+      url; // This ensures old code using article.link still works
 
   Article({
+    this.id = '',
     required this.title,
     required this.author,
     required this.publishDate,
     required this.imageUrl,
-    required this.link,
-    required this.excerpt,
+    this.url = '', // renamed from 'link'
+    this.content = '', // full content
+    this.excerpt = '', // short description
     this.categories = const [],
+    this.isSponsored = false,
+    this.linkText = 'Read More',
+    this.source = '',
   });
 
   // Helper method to parse RSS dates
@@ -91,19 +106,53 @@ class Article {
       author: item.dc?.creator ?? 'Unknown',
       publishDate: _parseRssDate(item.pubDate),
       excerpt: excerpt,
+      content: excerpt, // For RSS items, content is the same as excerpt
       imageUrl: imageUrl,
-      link: item.link ?? '',
+      url: item.link ?? '',
       categories: categories,
+      isSponsored: false, // RSS feeds are not sponsored content
+      source: item.source?.title ?? 'News Feed',
+    );
+  }
+
+  // Factory constructor for Firestore sponsored articles
+  factory Article.fromFirestore(String documentId, Map<String, dynamic> data) {
+    return Article(
+      id: documentId,
+      title: data['title'] ?? 'No Title',
+      author: data['authorName'] ?? 'Sponsored',
+      publishDate: data['publishedAt']?.toDate() ?? DateTime.now(),
+      imageUrl: data['headerImageUrl'] ?? 'assets/images/Default.jpeg',
+      content: data['content'] ?? '',
+      excerpt:
+          data['content'] != null && data['content'].length > 150
+              ? '${data['content'].substring(0, 150)}...'
+              : data['content'] ?? '',
+      url: data['ctaLink'] ?? '',
+      linkText: data['ctaText'] ?? 'Learn More',
+      isSponsored: true,
+      source: data['companyName'] ?? 'Sponsored Content',
+      categories: data['category'] != null ? [data['category']] : ['Sponsored'],
     );
   }
 
   // Returns the excerpt as properly formatted paragraphs
   String get formattedContent {
-    if (excerpt.isEmpty) return '';
+    if (content.isNotEmpty) {
+      // For sponsored articles with full content
+      return _formatText(content);
+    } else if (excerpt.isNotEmpty) {
+      // For RSS articles with only excerpt
+      return _formatText(excerpt);
+    }
+    return '';
+  }
 
+  // Helper method to format text
+  String _formatText(String text) {
     // Clean up common RSS/HTML issues
-    String content =
-        excerpt
+    String cleanedText =
+        text
             // Replace HTML line breaks with actual line breaks
             .replaceAll(RegExp(r'<br\s*\/?>'), '\n')
             // Replace multiple consecutive line breaks with double line breaks
@@ -122,7 +171,7 @@ class Article {
             .trim();
 
     // Split into paragraphs and clean up each paragraph
-    List<String> paragraphs = content.split('\n\n');
+    List<String> paragraphs = cleanedText.split('\n\n');
     paragraphs = paragraphs.map((p) => p.trim()).toList();
 
     // Remove empty paragraphs
@@ -130,5 +179,11 @@ class Article {
 
     // Join with double line breaks for proper paragraph separation
     return paragraphs.join('\n\n');
+  }
+
+  // Helper method to get a shorter excerpt for previews
+  String get shortExcerpt {
+    if (excerpt.length <= 100) return excerpt;
+    return '${excerpt.substring(0, 97)}...';
   }
 }

@@ -29,7 +29,7 @@ class ArticleDetailScreen extends StatelessWidget {
             icon: const Icon(Icons.share, color: Color(0xFFd2982a)),
             onPressed: () {
               Share.share(
-                '${article.title}\n\nRead more: ${article.link}',
+                '${article.title}\n\nRead more: ${article.url}', // Changed from article.link
                 subject: article.title,
               );
             },
@@ -43,7 +43,7 @@ class ArticleDetailScreen extends StatelessWidget {
                 MaterialPageRoute(
                   builder:
                       (context) => WebViewScreen(
-                        url: article.link,
+                        url: article.url, // Changed from article.link
                         title: article.title,
                       ),
                 ),
@@ -58,7 +58,7 @@ class ArticleDetailScreen extends StatelessWidget {
           children: [
             // Featured image
             Hero(
-              tag: 'article-${article.link}',
+              tag: 'article-${article.url}', // Changed from article.link
               child: Image.network(
                 article.imageUrl,
                 height: 220,
@@ -111,27 +111,22 @@ class ArticleDetailScreen extends StatelessWidget {
                   const Divider(height: 24),
 
                   // Article content in paragraphs
-                  ...paragraphs
-                      .map(
-                        (paragraph) => Column(
-                          children: [
-                            Text(
-                              paragraph,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                height:
-                                    1.6, // Line height for better readability
-                                color: Color(0xFF2d2c31),
-                              ),
-                              textAlign: TextAlign.justify,
-                            ),
-                            const SizedBox(
-                              height: 16,
-                            ), // Space between paragraphs
-                          ],
+                  ...paragraphs.map(
+                    (paragraph) => Column(
+                      children: [
+                        Text(
+                          paragraph,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            height: 1.6, // Line height for better readability
+                            color: Color(0xFF2d2c31),
+                          ),
+                          textAlign: TextAlign.justify,
                         ),
-                      )
-                      ,
+                        const SizedBox(height: 16), // Space between paragraphs
+                      ],
+                    ),
+                  ),
 
                   const SizedBox(height: 16),
 
@@ -145,7 +140,7 @@ class ArticleDetailScreen extends StatelessWidget {
                           MaterialPageRoute(
                             builder:
                                 (context) => WebViewScreen(
-                                  url: article.link,
+                                  url: article.url, // Changed from article.link
                                   title: article.title,
                                 ),
                           ),
