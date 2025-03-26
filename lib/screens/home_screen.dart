@@ -21,7 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _currentCategory = 'All News';
 
   // Store the source of each article for filtering
-  Map<String, String> _articleSources = {};
+  final Map<String, String> _articleSources = {};
 
   @override
   void initState() {

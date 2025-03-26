@@ -4,6 +4,10 @@ class WeatherForecast {
   final String condition;
   final double temp;
   final String icon;
+  final double tempMin;
+  final double tempMax;
+  final double pop; // Probability of precipitation
+  final double uvIndex;
 
   WeatherForecast({
     required this.date,
@@ -11,12 +15,16 @@ class WeatherForecast {
     required this.condition,
     required this.temp,
     required this.icon,
+    this.tempMin = 0.0,
+    this.tempMax = 0.0,
+    this.pop = 0.0,
+    this.uvIndex = 0.0,
   });
 
   factory WeatherForecast.fromJson(Map<String, dynamic> json) {
     final timestamp = json['dt'] * 1000;
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    
+
     return WeatherForecast(
       date: date,
       day: _getDayName(date),
@@ -28,25 +36,30 @@ class WeatherForecast {
 
   static String _getDayName(DateTime date) {
     final now = DateTime.now();
-    
+
     if (date.day == now.day) {
       return 'Today';
-    }
-    
-    if (date.day == now.day + 1) {
+    } else if (date.day == now.day + 1) {
       return 'Tomorrow';
-    }
-    
-    // Full day names
-    switch (date.weekday) {
-      case 1: return 'Monday';
-      case 2: return 'Tuesday';
-      case 3: return 'Wednesday';
-      case 4: return 'Thursday';
-      case 5: return 'Friday';
-      case 6: return 'Saturday';
-      case 7: return 'Sunday';
-      default: return '';
+    } else {
+      switch (date.weekday) {
+        case 1:
+          return 'Monday';
+        case 2:
+          return 'Tuesday';
+        case 3:
+          return 'Wednesday';
+        case 4:
+          return 'Thursday';
+        case 5:
+          return 'Friday';
+        case 6:
+          return 'Saturday';
+        case 7:
+          return 'Sunday';
+        default:
+          return '';
+      }
     }
   }
 }

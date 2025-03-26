@@ -1,128 +1,211 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import '../models/weather_data.dart';
-import '../models/weather_forecast.dart';
+import 'package:news_app/models/weather_data.dart';
+import 'package:news_app/models/weather_forecast.dart';
 
 class WeatherService {
-  static const String apiKey = 'd7265370b126555980c6dc783ebe185e';
-  
-  // Default ZIP code (Kinston, NC)
-  static const String defaultZip = '28501';
-  
-  // Cache duration in minutes
-  static const int cacheDuration = 30;
+  // Make this accessible to the weather screen
+  static const apiKey = 'd7265370b126555980c6dc783ebe185e';
+  static const String _baseUrl = 'https://api.openweathermap.org/data/2.5';
+  static const String _geoUrl = 'https://api.openweathermap.org/geo/1.0';
 
-  // Get current weather data
-  Future<WeatherData> getCurrentWeather() async {
-    final zipCode = await _getZipCode();
-    final url = 'https://api.openweathermap.org/data/2.5/weather?zip=$zipCode,us&units=imperial&appid=$apiKey';
+  // Add default ZIP code
+  final String _defaultZip = '28501'; // Kinston, NC
 
-    try {
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        return WeatherData.fromJson(json.decode(response.body));
-      } else {
-        throw Exception('Failed to load weather data: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error fetching current weather: $e');
-      throw Exception('Error fetching weather data');
-    }
-  }
-
-  // Get 5-day forecast
+  // Add the getForecast method for the dashboard
   Future<List<WeatherForecast>> getForecast() async {
-    final zipCode = await _getZipCode();
-    final url = 'https://api.openweathermap.org/data/2.5/forecast?zip=$zipCode,us&units=imperial&appid=$apiKey';
-
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final cacheKey = 'weather_forecast_$zipCode';
-      final cachedData = prefs.getString(cacheKey);
-      
-      // Check if we have cached data and it's still valid
-      if (cachedData != null) {
-        final cachedTime = prefs.getInt('${cacheKey}_time') ?? 0;
-        final now = DateTime.now().millisecondsSinceEpoch;
-        final elapsed = (now - cachedTime) / (1000 * 60); // minutes
-        
-        if (elapsed < cacheDuration) {
-          print('Using cached forecast data');
-          final cachedForecast = json.decode(cachedData);
-          return _processForecast(cachedForecast);
+      // Use the default ZIP code if none provided
+      return getDailyForecast(_defaultZip);
+    } catch (e) {
+      // Return empty list on error
+      return [];
+    }
+  }
+
+  Future<WeatherData> getCurrentWeather(String zipCode) async {
+    final response = await http.get(
+      Uri.parse(
+        '$_baseUrl/weather?zip=$zipCode,us&units=imperial&appid=$apiKey',
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return WeatherData.fromJson(data);
+    } else {
+      throw Exception('Failed to load weather data: ${response.statusCode}');
+    }
+  }
+
+  Future<List<WeatherForecast>> getHourlyForecast(String zipCode) async {
+    final response = await http.get(
+      Uri.parse(
+        '$_baseUrl/forecast?zip=$zipCode,us&units=imperial&appid=$apiKey',
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final List<dynamic> forecastList = data['list'];
+
+      // Map each forecast to WeatherForecast object
+      return forecastList.map((item) {
+        final timestamp = item['dt'] * 1000;
+        final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+
+        // Extract precipitation probability if available
+        double precipitation = 0.0;
+        if (item.containsKey('pop')) {
+          precipitation = (item['pop'] as num).toDouble();
         }
-      }
-      
-      // Fetch new data
-      final response = await http.get(Uri.parse(url));
+
+        return WeatherForecast(
+          date: date,
+          day: _getDayName(date),
+          condition: item['weather'][0]['main'],
+          temp: (item['main']['temp'] as num).toDouble(),
+          tempMin: (item['main']['temp_min'] as num).toDouble(),
+          tempMax: (item['main']['temp_max'] as num).toDouble(),
+          icon: item['weather'][0]['icon'],
+          pop: precipitation,
+          uvIndex: 0.0,
+        );
+      }).toList();
+    } else {
+      throw Exception('Failed to load forecast data: ${response.statusCode}');
+    }
+  }
+
+  Future<List<WeatherForecast>> getDailyForecast(String zipCode) async {
+    // First get coordinates from ZIP code
+    final coordsResponse = await http.get(
+      Uri.parse('$_geoUrl/zip?zip=$zipCode,us&appid=$apiKey'),
+    );
+
+    if (coordsResponse.statusCode != 200) {
+      throw Exception(
+        'Failed to get coordinates from ZIP code: ${coordsResponse.statusCode}',
+      );
+    }
+
+    final coordsData = jsonDecode(coordsResponse.body);
+    final lat = coordsData['lat'];
+    final lon = coordsData['lon'];
+
+    // Now get the daily forecast with OneCall API
+    final response = await http.get(
+      Uri.parse(
+        '$_baseUrl/onecall?lat=$lat&lon=$lon&exclude=current,minutely,hourly,alerts&units=imperial&appid=$apiKey',
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      final List<dynamic> dailyList = data['daily'];
+
+      // Take only the first 5 days
+      final limitedList = dailyList.take(5).toList();
+
+      return limitedList.map<WeatherForecast>((item) {
+        final timestamp = item['dt'] * 1000;
+        final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+
+        double uvIndex = 0.0;
+        if (item.containsKey('uvi')) {
+          uvIndex = (item['uvi'] as num).toDouble();
+        }
+
+        return WeatherForecast(
+          date: date,
+          day: _getDayName(date),
+          condition: item['weather'][0]['main'],
+          temp: (item['temp']['day'] as num).toDouble(),
+          tempMin: (item['temp']['min'] as num).toDouble(),
+          tempMax: (item['temp']['max'] as num).toDouble(),
+          icon: item['weather'][0]['icon'],
+          pop: item['pop'] != null ? (item['pop'] as num).toDouble() : 0.0,
+          uvIndex: uvIndex,
+        );
+      }).toList();
+    } else {
+      throw Exception('Failed to load daily forecast: ${response.statusCode}');
+    }
+  }
+
+  Future<Map<String, dynamic>> getAirQuality(String zipCode) async {
+    // First get coordinates from ZIP code
+    final coordsResponse = await http.get(
+      Uri.parse('$_geoUrl/zip?zip=$zipCode,us&appid=$apiKey'),
+    );
+
+    if (coordsResponse.statusCode != 200) {
+      throw Exception(
+        'Failed to get coordinates from ZIP code: ${coordsResponse.statusCode}',
+      );
+    }
+
+    final coordsData = jsonDecode(coordsResponse.body);
+    final lat = coordsData['lat'];
+    final lon = coordsData['lon'];
+
+    // Now get the air quality data
+    final response = await http.get(
+      Uri.parse('$_baseUrl/air_pollution?lat=$lat&lon=$lon&appid=$apiKey'),
+    );
+
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception(
+        'Failed to load air quality data: ${response.statusCode}',
+      );
+    }
+  }
+
+  Future<String?> getCityFromZip(String zipCode) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_geoUrl/zip?zip=$zipCode,us&appid=$apiKey'),
+      );
 
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        
-        // Cache the response
-        prefs.setString(cacheKey, response.body);
-        prefs.setInt('${cacheKey}_time', DateTime.now().millisecondsSinceEpoch);
-        
-        return _processForecast(data);
-      } else {
-        throw Exception('Failed to load forecast data: ${response.statusCode}');
+        final data = jsonDecode(response.body);
+        return '${data['name']}, ${data['country']}';
       }
     } catch (e) {
-      print('Error fetching forecast: $e');
-      throw Exception('Error fetching forecast data');
+      // Silently fail and return null
     }
+    return null;
   }
 
-  // Process forecast data to get one forecast per day
-  List<WeatherForecast> _processForecast(Map<String, dynamic> data) {
-    final List<dynamic> list = data['list'];
-    
-    // Get one forecast for each day at noon
-    final Map<String, WeatherForecast> dailyForecasts = {};
-    
-    for (var item in list) {
-      final forecast = WeatherForecast.fromJson(item);
-      final date = forecast.date;
-      final dateString = '${date.year}-${date.month}-${date.day}';
-      
-      // If we don't have this day yet, or if this forecast is closer to noon
-      if (!dailyForecasts.containsKey(dateString)) {
-        dailyForecasts[dateString] = forecast;
-      } else {
-        // Try to get forecasts for around noon (12-2pm)
-        final existingHour = dailyForecasts[dateString]!.date.hour;
-        final newHour = date.hour;
-        
-        if ((newHour == 12 || newHour == 13 || newHour == 14) && 
-            (existingHour < 12 || existingHour > 14)) {
-          dailyForecasts[dateString] = forecast;
-        }
+  static String _getDayName(DateTime date) {
+    final now = DateTime.now();
+    final difference = date.difference(now).inDays;
+
+    if (difference == 0) {
+      return 'Today';
+    } else if (difference == 1) {
+      return 'Tomorrow';
+    } else {
+      switch (date.weekday) {
+        case 1:
+          return 'Monday';
+        case 2:
+          return 'Tuesday';
+        case 3:
+          return 'Wednesday';
+        case 4:
+          return 'Thursday';
+        case 5:
+          return 'Friday';
+        case 6:
+          return 'Saturday';
+        case 7:
+          return 'Sunday';
+        default:
+          return '';
       }
     }
-    
-    // Convert to list and sort by date
-    final forecasts = dailyForecasts.values.toList();
-    forecasts.sort((a, b) => a.date.compareTo(b.date));
-    
-    // Return at most 5 days
-    return forecasts.take(5).toList();
-  }
-
-  // Get the user's ZIP code from preferences or use default
-  Future<String> _getZipCode() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getString('user_zip_code') ?? defaultZip;
-    } catch (e) {
-      return defaultZip;
-    }
-  }
-
-  // Allow updating the ZIP code
-  Future<void> setZipCode(String zipCode) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_zip_code', zipCode);
   }
 }

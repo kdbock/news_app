@@ -3,8 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 import 'package:news_app/services/auth_service.dart';
-import 'package:news_app/screens/home_screen.dart';
-import 'package:news_app/screens/dashboard_screen.dart'; // Add this import
+// Add this import
 // import 'package:sign_in_with_apple/sign_in_with_apple.dart';  // Comment out temporarily
 
 class AuthScreen extends StatefulWidget {

@@ -15,7 +15,7 @@ class AuthService {
     }
 
     try {
-      UserCredential result = await _auth!.signInWithEmailAndPassword(
+      UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -34,7 +34,7 @@ class AuthService {
     }
 
     try {
-      UserCredential result = await _auth!.createUserWithEmailAndPassword(
+      UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -64,7 +64,7 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      UserCredential result = await _auth!.signInWithCredential(credential);
+      UserCredential result = await _auth.signInWithCredential(credential);
       return result.user;
     } catch (e) {
       print('Google sign-in error: $e');
@@ -80,7 +80,7 @@ class AuthService {
     }
 
     await _googleSignIn.signOut();
-    return await _auth!.signOut();
+    return await _auth.signOut();
   }
 
   // Get current user
@@ -90,7 +90,7 @@ class AuthService {
       return null;
     }
 
-    return _auth!.currentUser;
+    return _auth.currentUser;
   }
 
   // Stream of authentication state changes
@@ -100,6 +100,6 @@ class AuthService {
       return Stream.value(null);
     }
 
-    return _auth!.authStateChanges();
+    return _auth.authStateChanges();
   }
 }

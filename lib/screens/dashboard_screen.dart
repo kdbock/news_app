@@ -4,7 +4,7 @@ import 'package:news_app/models/article.dart';
 import 'package:news_app/widgets/news_card_mini.dart';
 import 'package:news_app/screens/web_view_screen.dart';
 import 'package:news_app/services/weather_service.dart';
-import 'package:news_app/models/weather_forecast.dart';
+import 'package:news_app/models/weather_forecast.dart' as weather_forecast; // Update import to use 'as' to avoid conflictsas weather_forecast; // Update import to use 'as' to avoid conflicts
 import 'package:news_app/screens/weather_screen.dart';
 import 'package:news_app/screens/home_screen.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
@@ -12,6 +12,21 @@ import 'package:news_app/widgets/news_search_delegate.dart'
     as news_search_delegate; // Add this import
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:news_app/screens/local_news_screen.dart';
+import 'package:news_app/screens/politics_screen.dart';
+import 'package:news_app/screens/sports_screen.dart';
+import 'package:news_app/screens/obituaries_screen.dart';
+import 'package:news_app/screens/columns_screen.dart';
+import 'package:news_app/screens/public_notices_screen.dart';
+import 'package:news_app/screens/classifieds_screen.dart';
+import 'package:news_app/screens/submit_news_tip.dart';
+import 'package:news_app/screens/submit_sponsored_event.dart';
+import 'package:news_app/screens/submit_sponsored_article.dart';
+import 'package:news_app/screens/profile_screen.dart';
+import 'package:news_app/screens/edit_profile_screen.dart';
+import 'package:news_app/screens/settings_screen.dart';
+import 'package:news_app/screens/article_detail_screen.dart';
+import 'package:news_app/screens/calendar_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -29,7 +44,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Article> _classifiedsNews = [];
   List<Article> _obituariesNews = [];
   List<Article> _publicNoticesNews = [];
-  List<WeatherForecast> _forecasts = [];
+  List<Article> _politicsNews = [];
+  List<weather_forecast.WeatherForecast> _forecasts = [];
   bool _isLoading = true;
 
   // Add selected tab index
@@ -63,6 +79,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _newsService.fetchClassifieds(),
         _newsService.fetchObituaries(),
         _newsService.fetchPublicNotices(),
+        _newsService.fetchNewsByUrl(
+          'https://www.ncpoliticalnews.com/news?format=rss',
+        ),
         _weatherService.getForecast(),
       ]);
 
@@ -75,20 +94,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _classifiedsNews = results[3] as List<Article>;
           _obituariesNews = results[4] as List<Article>;
           _publicNoticesNews = results[5] as List<Article>;
-          _forecasts = results[6] as List<WeatherForecast>;
+          _politicsNews = results[6] as List<Article>;
+          _forecasts = results[7] as List<weather_forecast.WeatherForecast>;
           _isLoading = false;
         });
 
-        // Replace print with debugPrint or a logger for production code
         debugPrint(
           'Loaded feeds - Local: ${_localNews.length}, Sports: ${_sportsNews.length}, '
+          'Politics: ${_politicsNews.length}, '
           'Columns: ${_columnsNews.length}, Classifieds: ${_classifiedsNews.length}, '
           'Obituaries: ${_obituariesNews.length}, Public Notices: ${_publicNoticesNews.length}, '
           'Weather Forecasts: ${_forecasts.length}',
         );
       }
     } catch (e) {
-      // Replace print with debugPrint or a logger
       debugPrint('Error loading dashboard data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
@@ -97,6 +116,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
       }
     }
+  }
+
+  // Rest of your existing methods...
+
+  // Create a stateless widget for the Weather tab content
+  Widget _buildWeatherTab() {
+    return WeatherTab(
+      weatherService: _weatherService,
+      forecasts: _forecasts,
+    );
   }
 
   @override
@@ -133,37 +162,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       // Add drawer
       drawer: _buildDrawer(context),
-      body:
-          _isLoading
-              ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFd2982a)),
-              )
-              : PageView(
-                controller: _pageController,
-                physics:
-                    const NeverScrollableScrollPhysics(), // Disable swiping
-                onPageChanged: (index) {
-                  setState(() {
-                    _selectedIndex = index;
-                  });
-                },
-                children: [
-                  // Home/Dashboard tab
-                  _buildDashboardContent(),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFd2982a)),
+            )
+          : PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(), // Disable swiping
+              onPageChanged: (index) {
+                setState(() {
+                  _selectedIndex = index;
+                });
+              },
+              children: [
+                // Home/Dashboard tab
+                _buildDashboardContent(),
 
-                  // News tab
-                  HomeScreen(),
+                // News tab
+                const HomeScreen(),
 
-                  // Weather tab - inline weather content
-                  WeatherTab(
-                    weatherService: _weatherService,
-                    forecasts: _forecasts,
-                  ),
+                // Weather tab - inline weather content
+                WeatherTab(
+                  weatherService: _weatherService,
+                  forecasts: _forecasts,
+                ),
 
-                  // Calendar tab - placeholder for now
-                  const Center(child: Text('Calendar Coming Soon')),
-                ],
-              ),
+                // Calendar tab
+                const CalendarScreen(),
+              ],
+            ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white,
         elevation: 8.0,
@@ -199,7 +226,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionHeader('Latest News'),
+            _buildSectionHeader(
+              'Latest News',
+              onSeeAllPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LocalNewsScreen(),
+                  ),
+                );
+              },
+            ),
             _buildNewsSlider(_localNews),
 
             _buildSectionHeader(
@@ -214,26 +251,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildWeatherPreview(),
 
             // Sports News section
-            _buildSectionHeader('Sports'),
+            _buildSectionHeader(
+              'Sports',
+              onSeeAllPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SportsScreen()),
+                );
+              },
+            ),
             _buildNewsSlider(_sportsNews),
 
-            _buildSectionHeader('Upcoming Events'),
-            _buildEventsPreview(),
+            // Politics News section
+            _buildSectionHeader(
+              'NC Politics',
+              onSeeAllPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PoliticsScreen(),
+                  ),
+                );
+              },
+            ),
+            _buildNewsSlider(_politicsNews),
 
             // Columns News section
-            _buildSectionHeader('Columns'),
+            _buildSectionHeader(
+              'Columns',
+              onSeeAllPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ColumnsScreen(),
+                  ),
+                );
+              },
+            ),
             _buildNewsSlider(_columnsNews),
 
             // Classifieds News section
-            _buildSectionHeader('Classifieds'),
+            _buildSectionHeader(
+              'Classifieds',
+              onSeeAllPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ClassifiedsScreen(),
+                  ),
+                );
+              },
+            ),
             _buildNewsSlider(_classifiedsNews),
 
             // Obituaries News section
-            _buildSectionHeader('Obituaries'),
+            _buildSectionHeader(
+              'Obituaries',
+              onSeeAllPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ObituariesScreen(),
+                  ),
+                );
+              },
+            ),
             _buildNewsSlider(_obituariesNews),
 
             // Public Notices News section
-            _buildSectionHeader('Public Notices'),
+            _buildSectionHeader(
+              'Public Notices',
+              onSeeAllPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PublicNoticesScreen(),
+                  ),
+                );
+              },
+            ),
             _buildNewsSlider(_publicNoticesNews),
 
             const SizedBox(height: 20),
@@ -281,13 +377,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Color(0xFF2d2c31),
             ),
           ),
-          TextButton(
-            onPressed: onSeeAllPressed,
-            child: const Text(
-              'See All',
-              style: TextStyle(color: Color(0xFFd2982a)),
+          if (onSeeAllPressed != null)
+            TextButton(
+              onPressed: onSeeAllPressed,
+              child: const Text(
+                'See All',
+                style: TextStyle(color: Color(0xFFd2982a)),
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -365,90 +462,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  Widget _buildEventsPreview() {
-    // Mock events data
-    final events = [
-      {'title': 'Community Cleanup', 'date': 'Mar 27', 'location': 'Downtown'},
-      {
-        'title': 'Farmers Market',
-        'date': 'Mar 29',
-        'location': 'Heritage Park',
-      },
-      {'title': 'BBQ Festival', 'date': 'Apr 1', 'location': 'Fairgrounds'},
-      {'title': 'Town Hall Meeting', 'date': 'Apr 4', 'location': 'City Hall'},
-    ];
-
-    return SizedBox(
-      height: 130,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        itemCount: events.length,
-        itemBuilder: (context, index) {
-          final event = events[index];
-          return SizedBox(
-            width: 200,
-            child: Card(
-              margin: const EdgeInsets.all(8),
-              child: Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event['title']!,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 12),
-                        const SizedBox(width: 4),
-                        Text(
-                          event['date']!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on, size: 12),
-                        const SizedBox(width: 4),
-                        Text(
-                          event['location']!,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   void _openArticle(Article article) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => WebViewScreen(url: article.link, title: article.title),
-      ),
-    );
+    Navigator.pushNamed(context, '/article', arguments: article);
   }
 
   // Add this method for building the drawer
@@ -557,7 +572,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: const Text('Sports'),
             onTap: () {
               Navigator.pop(context);
-              // Navigate to sports
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SportsScreen()),
+              );
             },
           ),
 
@@ -566,7 +584,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             title: const Text('Politics'),
             onTap: () {
               Navigator.pop(context);
-              // Navigate to politics
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PoliticsScreen()),
+              );
             },
           ),
 
@@ -611,19 +632,43 @@ class _DashboardScreenState extends State<DashboardScreen> {
               color: Color(0xFFd2982a),
             ),
             title: const Text('News Tip'),
-            onTap: () => _launchSubmissionForm('news'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SubmitNewsTipScreen(),
+                ),
+              );
+            },
           ),
 
           ListTile(
             leading: const Icon(Icons.event, color: Color(0xFFd2982a)),
             title: const Text('Sponsored Event'),
-            onTap: () => _launchSubmissionForm('sponsored_event'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SubmitSponsoredEventScreen(),
+                ),
+              );
+            },
           ),
 
           ListTile(
             leading: const Icon(Icons.article, color: Color(0xFFd2982a)),
             title: const Text('Sponsored Article'),
-            onTap: () => _launchSubmissionForm('sponsored_article'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SubmitSponsoredArticleScreen(),
+                ),
+              );
+            },
           ),
 
           const Divider(),
@@ -635,8 +680,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               title: const Text('Profile'),
               onTap: () {
                 Navigator.pop(context);
-                // Navigate to profile
-                Navigator.pushNamed(context, '/profile');
+                // Navigate to profile screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ProfileScreen(),
+                  ),
+                );
               },
             ),
 
@@ -645,8 +695,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
               title: const Text('Edit Profile'),
               onTap: () {
                 Navigator.pop(context);
-                // Navigate to edit profile
-                Navigator.pushNamed(context, '/edit_profile');
+
+                // Get current user data
+                String firstName = '';
+                String lastName = '';
+                final String email = user.email ?? '';
+
+                // Parse display name into first and last name
+                if (user.displayName != null) {
+                  final nameParts = user.displayName!.split(' ');
+                  firstName = nameParts.first;
+                  lastName = nameParts.length > 1 ? nameParts.last : '';
+                }
+
+                // Navigate to edit profile with current user data
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => EditProfileScreen(
+                          firstName: firstName,
+                          lastName: lastName,
+                          email: email,
+                          phone:
+                              '(252) 555-1234', // Default or placeholder data
+                          zipCode:
+                              '28577', // These would come from Firestore in a real app
+                          birthday: '',
+                          textAlerts: true,
+                          dailyDigest: true,
+                          sportsNewsletter: false,
+                          politicalNewsletter: true,
+                        ),
+                  ),
+                );
               },
             ),
 
@@ -655,8 +737,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               title: const Text('Settings'),
               onTap: () {
                 Navigator.pop(context);
-                // Navigate to settings
-                Navigator.pushNamed(context, '/settings');
+                // Navigate to settings using direct push
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
+                );
               },
             ),
 
@@ -686,38 +773,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
     );
   }
-
-  // Add this method to handle form submissions
-  Future<void> _launchSubmissionForm(String type) async {
-    String url;
-    switch (type) {
-      case 'news':
-        url = 'https://www.neusenews.com/submit-a-news-tip';
-        break;
-      case 'sponsored_event':
-        url = 'https://www.neusenews.com/submit-sponsored-event';
-        break;
-      case 'sponsored_article':
-        url = 'https://www.neusenews.com/submit-sponsored-news';
-        break;
-      default:
-        url = 'https://www.neusenews.com/contact';
-    }
-
-    if (await canLaunch(url)) {
-      await launch(url);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not launch submission form')),
-      );
-    }
-  }
 }
 
 // Create a stateless widget for the Weather tab content
 class WeatherTab extends StatelessWidget {
   final WeatherService weatherService;
-  final List<WeatherForecast> forecasts;
+  final List<weather_forecast.WeatherForecast> forecasts;ecast> forecasts;
 
   const WeatherTab({
     super.key,
@@ -797,22 +858,29 @@ class WeatherTab extends StatelessWidget {
     switch (condition.toLowerCase()) {
       case 'clear':
         iconData = Icons.wb_sunny;
+        break;
       case 'clouds':
       case 'partly cloudy':
         iconData = Icons.cloud;
+        break;
       case 'rain':
       case 'drizzle':
         iconData = Icons.umbrella;
+        break;
       case 'thunderstorm':
         iconData = Icons.bolt;
+        break;
       case 'snow':
         iconData = Icons.ac_unit;
+        break;
       case 'mist':
       case 'fog':
       case 'haze':
         iconData = Icons.cloud_queue;
+        break;
       default:
         iconData = Icons.cloud;
+        break;
     }
     return Icon(iconData, color: const Color(0xFFd2982a), size: 30);
   }

@@ -12,11 +12,11 @@ class NewsCard extends StatelessWidget {
   final String? sourceTag; // Add this parameter
 
   const NewsCard({
-    Key? key,
+    super.key,
     required this.article,
     required this.onReadMore,
     this.sourceTag, // Optional source tag
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

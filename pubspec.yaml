@@ -17,12 +17,18 @@ dependencies:
   shared_preferences: ^2.2.2       # Local storage
   cached_network_image: ^3.3.0     # Cache news images
   intl: ^0.19.0                    # Date formatting (updated version)
-  url_launcher: ^6.1.11            # Open URLs
+  url_launcher: ^6.2.4            # Open URLs
   cupertino_icons: ^1.0.8          # iOS-style icons
   share_plus: ^7.2.1
   firebase_auth: ^4.15.0           # Correct version
   firebase_core: ^2.13.0           # Correct version
   webview_flutter: ^4.4.2          # For in-app browsing
+  cloud_firestore: ^4.15.5
+  firebase_storage: ^11.6.6
+  image_picker: ^1.0.7
+  flutter_quill: ^10.5.17         # Updated version to resolve conflict
+  package_info_plus: ^8.3.0       # Updated version to resolve conflict
+  table_calendar: ^3.0.9
 
 dev_dependencies:
   flutter_test:

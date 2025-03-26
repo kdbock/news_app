@@ -84,7 +84,7 @@ class NewsCardMini extends StatelessWidget {
                         color: Color(0xFF2d2c31),
                       ),
                       maxLines: 2,
-                      textAlign: TextAlign.center,
+                      textAlign: TextAlign.left,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],

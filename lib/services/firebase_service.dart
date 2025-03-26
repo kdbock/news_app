@@ -2,7 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 class FirebaseService {
   static bool get isAvailable =>
-      Firebase.apps.isNotEmpty && Firebase.apps[0] != null;
+      Firebase.apps.isNotEmpty;
 
   static void checkFirebase() {
     if (!isAvailable) {
