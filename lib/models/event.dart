@@ -25,36 +25,32 @@ class Event {
     this.imageUrl,
   });
 
+  @override
+  String toString() => title;
+
   factory Event.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    final Timestamp timestamp = data['eventDate'] as Timestamp;
+
+    // Safely convert Timestamp to DateTime
+    DateTime eventDate;
+    if (data['eventDate'] is Timestamp) {
+      eventDate = (data['eventDate'] as Timestamp).toDate();
+    } else {
+      // Fallback if eventDate is missing or not a timestamp
+      eventDate = DateTime.now();
+    }
 
     return Event(
       id: doc.id,
-      title: data['title'] as String,
-      description: data['description'] as String,
-      location: data['location'] as String,
-      startTime: data['startTime'] as String,
-      endTime: data.containsKey('endTime') ? data['endTime'] as String : null,
-      organizer: data['organizer'] as String,
-      isSponsored: data['isSponsored'] as bool,
-      eventDate: timestamp.toDate(),
-      imageUrl:
-          data.containsKey('imageUrl') ? data['imageUrl'] as String : null,
+      title: data['title'] as String? ?? 'Untitled Event',
+      description: data['description'] as String? ?? 'No description provided',
+      location: data['location'] as String? ?? 'Location not specified',
+      startTime: data['startTime'] as String? ?? 'TBD',
+      endTime: data['endTime'] as String?,
+      organizer: data['organizer'] as String? ?? 'Community Member',
+      isSponsored: data['isSponsored'] as bool? ?? false,
+      eventDate: eventDate,
+      imageUrl: data['imageUrl'] as String?,
     );
-  }
-
-  Map<String, dynamic> toFirestore() {
-    return {
-      'title': title,
-      'description': description,
-      'location': location,
-      'startTime': startTime,
-      'endTime': endTime,
-      'organizer': organizer,
-      'isSponsored': isSponsored,
-      'eventDate': Timestamp.fromDate(eventDate),
-      'imageUrl': imageUrl,
-    };
   }
 }

@@ -1,20 +1,28 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:news_app/screens/submit_sponsored_event.dart';
 import 'package:news_app/models/event.dart';
+import 'package:news_app/services/event_service.dart';
 
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key});
+  // Add parameter for selected date
+  final DateTime? selectedDate;
+
+  const CalendarScreen({super.key, this.selectedDate});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
+  // Add EventService
+  final EventService _eventService = EventService();
+
   CalendarFormat _calendarFormat = CalendarFormat.month;
-  DateTime _focusedDay = DateTime.now();
+  late DateTime _focusedDay;
   DateTime? _selectedDay;
   Map<DateTime, List<Event>> _events = {};
   List<Event> _selectedEvents = [];
@@ -23,104 +31,284 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
+    // Initialize focused day with widget's selectedDate if provided
+    _focusedDay = widget.selectedDate ?? DateTime.now();
     _selectedDay = _focusedDay;
-    _loadEvents();
+
+    // Load events with error handling during initialization
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadEvents().catchError((error) {
+        debugPrint('Error during initial event loading: $error');
+        // Show a message to the user
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load events: $error'),
+              action: SnackBarAction(label: 'RETRY', onPressed: _loadEvents),
+            ),
+          );
+        }
+      });
+    });
   }
 
   Future<void> _loadEvents() async {
     setState(() => _isLoading = true);
 
     try {
-      // Get events from Firestore
-      final QuerySnapshot snapshot =
-          await FirebaseFirestore.instance
-              .collection('events')
-              .where(
-                'eventDate',
-                isGreaterThanOrEqualTo: DateTime(
-                  _focusedDay.year,
-                  _focusedDay.month,
-                  1,
-                ),
-              )
-              .where(
-                'eventDate',
-                isLessThan: DateTime(
-                  _focusedDay.year,
-                  _focusedDay.month + 1,
-                  1,
-                ),
-              )
-              .get();
+      debugPrint(
+        'Fetching events for ${_focusedDay.year}-${_focusedDay.month}',
+      );
 
-      final Map<DateTime, List<Event>> events = {};
+      // Use EventService to get events for the month
+      final eventMap = await _eventService.getEventsForMonth(_focusedDay);
 
-      // Process the events
-      for (final doc in snapshot.docs) {
-        final data = doc.data() as Map<String, dynamic>;
-        final Timestamp timestamp = data['eventDate'] as Timestamp;
-        final eventDate = timestamp.toDate();
+      if (mounted) {
+        setState(() {
+          _events = eventMap;
+          _isLoading = false;
+          _updateSelectedEvents();
+        });
 
-        // Normalize date (remove time component)
-        final normalizedDate = DateTime(
-          eventDate.year,
-          eventDate.month,
-          eventDate.day,
+        debugPrint(
+          'Calendar updated with ${eventMap.length} days containing events',
         );
-
-        final event = Event(
-          id: doc.id,
-          title: data['title'] as String,
-          description: data['description'] as String,
-          location: data['location'] as String,
-          startTime: data['startTime'] as String,
-          endTime:
-              data.containsKey('endTime') ? data['endTime'] as String : null,
-          organizer: data['organizer'] as String,
-          isSponsored: data['isSponsored'] as bool,
-          eventDate: normalizedDate,
-          imageUrl:
-              data.containsKey('imageUrl') ? data['imageUrl'] as String : null,
-        );
-
-        if (events[normalizedDate] != null) {
-          events[normalizedDate]!.add(event);
-        } else {
-          events[normalizedDate] = [event];
-        }
       }
-
-      setState(() {
-        _events = events;
-        _isLoading = false;
-        _updateSelectedEvents();
-      });
     } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading events: $e')));
+      debugPrint('Error loading events: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading events: $e'),
+            duration: const Duration(seconds: 5),
+            action: SnackBarAction(label: 'RETRY', onPressed: _loadEvents),
+          ),
+        );
+      }
     }
   }
 
   void _updateSelectedEvents() {
     if (_selectedDay != null) {
-      final normalizedDate = DateTime(
+      final selectedDate = DateTime(
         _selectedDay!.year,
         _selectedDay!.month,
         _selectedDay!.day,
       );
+
       setState(() {
-        _selectedEvents = _events[normalizedDate] ?? [];
+        _selectedEvents = _events[selectedDate] ?? [];
       });
     }
   }
 
-  List<Event> _getEventsForDay(DateTime day) {
-    final normalizedDate = DateTime(day.year, day.month, day.day);
-    return _events[normalizedDate] ?? [];
+  // Add this method to test your Firebase connection
+  void _testFirebaseConnection() async {
+    try {
+      debugPrint('Testing Firebase connection...');
+      // Try to get just one document to test connection
+      final testQuery = await FirebaseFirestore.instance
+          .collection('events')
+          .limit(1)
+          .get()
+          .timeout(const Duration(seconds: 5));
+
+      debugPrint(
+        'Firebase connection successful. Got ${testQuery.docs.length} documents.',
+      );
+
+      // Show connection status
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Firebase connection successful')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Firebase connection test failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Firebase connection failed: $e')),
+        );
+      }
+    }
   }
 
+  // Add a method to create a test event
+  void _addTestEvent() async {
+    try {
+      await _eventService.addTestEvent();
+      // Clear EventService cache to ensure fresh data
+      _eventService.clearCache();
+      // Reload events
+      await _loadEvents();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Test event created successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error creating test event: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error creating test event: $e')),
+        );
+      }
+    }
+  }
+
+  // Add this method to your _CalendarScreenState class
+
+  void _checkDatabaseStructure() async {
+    try {
+      debugPrint('Checking Firebase database structure...');
+
+      // List all collections in the root of the database
+      final FirebaseFirestore db = FirebaseFirestore.instance;
+
+      // Try to access the events collection
+      final eventsCollection = await db.collection('events').get();
+
+      debugPrint(
+        'Events collection exists: ${eventsCollection.docs.isNotEmpty}',
+      );
+      debugPrint(
+        'Events collection contains ${eventsCollection.size} documents.',
+      );
+
+      // If there are documents, check the structure of the first one
+      if (eventsCollection.docs.isNotEmpty) {
+        final sampleDoc = eventsCollection.docs.first;
+        final data = sampleDoc.data();
+
+        debugPrint('Sample document ID: ${sampleDoc.id}');
+        debugPrint('Sample document fields:');
+
+        data.forEach((key, value) {
+          final valueType = value.runtimeType.toString();
+          final valueString =
+              (value is Timestamp)
+                  ? 'Timestamp(${value.toDate()})'
+                  : value.toString();
+
+          debugPrint('- $key: $valueString (Type: $valueType)');
+        });
+
+        // Check for required fields
+        final requiredFields = [
+          'title',
+          'description',
+          'location',
+          'startTime',
+          'eventDate',
+          'organizer',
+          'isSponsored',
+        ];
+
+        for (final field in requiredFields) {
+          debugPrint('Has "$field": ${data.containsKey(field)}');
+        }
+      }
+
+      // Show a summary in the UI
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Database check complete. Found ${eventsCollection.size} events.',
+            ),
+            action: SnackBarAction(
+              label: 'DETAILS',
+              onPressed: () => _showDatabaseReport(eventsCollection.docs),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error checking database structure: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Database check failed: $e')));
+      }
+    }
+  }
+
+  void _showDatabaseReport(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Database Structure Report'),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView(
+                shrinkWrap: true,
+                children: [
+                  Text('Found ${docs.length} events in the database.'),
+                  const Divider(),
+                  if (docs.isEmpty)
+                    const Text(
+                      'No events found in database. Try adding one first.',
+                    )
+                  else
+                    ...docs.map((doc) {
+                      final data = doc.data();
+                      return ExpansionTile(
+                        title: Text(data['title'] as String? ?? 'Untitled'),
+                        subtitle: Text('ID: ${doc.id}'),
+                        children:
+                            data.entries.map<Widget>((entry) {
+                              String valueText = entry.value.toString();
+                              if (entry.value is Timestamp) {
+                                valueText =
+                                    (entry.value as Timestamp)
+                                        .toDate()
+                                        .toString();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 4.0,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      '${entry.key}: ',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Expanded(child: Text(valueText)),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                      );
+                    }).toList(),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFd2982a),
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('CLOSE'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // Implement the rest of your calendar screen here...
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -134,24 +322,15 @@ class _CalendarScreenState extends State<CalendarScreen> {
         ),
         backgroundColor: Colors.white,
         elevation: 1,
+        // Remove all the debugging icons
         actions: [
+          // Keep only the refresh button with a more appropriate icon
           IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFFd2982a)),
+            icon: const Icon(Icons.event_available, color: Color(0xFFd2982a)),
             onPressed: _loadEvents,
+            tooltip: 'Refresh Calendar',
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const SubmitSponsoredEventScreen(),
-            ),
-          ).then((_) => _loadEvents()); // Refresh calendar after returning
-        },
-        backgroundColor: const Color(0xFFd2982a),
-        child: const Icon(Icons.add),
       ),
       body:
           _isLoading
@@ -160,125 +339,151 @@ class _CalendarScreenState extends State<CalendarScreen> {
               )
               : Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  // Keep the rest of your calendar UI unchanged
+                  TableCalendar(
+                    firstDay: DateTime.utc(2020, 1, 1),
+                    lastDay: DateTime.utc(2030, 12, 31),
+                    focusedDay: _focusedDay,
+                    calendarFormat: _calendarFormat,
+
+                    // Event loader
+                    eventLoader: (day) {
+                      final normalizedDate = DateTime(
+                        day.year,
+                        day.month,
+                        day.day,
+                      );
+                      return _events[normalizedDate] ?? [];
+                    },
+
+                    // Selection
+                    selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                    onDaySelected: (selectedDay, focusedDay) {
+                      setState(() {
+                        _selectedDay = selectedDay;
+                        _focusedDay = focusedDay;
+                        _updateSelectedEvents();
+                      });
+                    },
+
+                    // Format and page changes
+                    onFormatChanged:
+                        (format) => setState(() => _calendarFormat = format),
+                    onPageChanged: (focusedDay) {
+                      _focusedDay = focusedDay;
+                      _loadEvents();
+                    },
+
+                    // Calendar styling to match app theme
+                    calendarStyle: const CalendarStyle(
+                      // Selected day
+                      selectedDecoration: BoxDecoration(
+                        color: Color(0xFFd2982a),
+                        shape: BoxShape.circle,
                       ),
-                      child: TableCalendar(
-                        firstDay: DateTime.utc(2020, 1, 1),
-                        lastDay: DateTime.utc(2030, 12, 31),
-                        focusedDay: _focusedDay,
-                        calendarFormat: _calendarFormat,
-                        eventLoader: _getEventsForDay,
-                        selectedDayPredicate: (day) {
-                          return isSameDay(_selectedDay, day);
-                        },
-                        onDaySelected: (selectedDay, focusedDay) {
-                          if (!isSameDay(_selectedDay, selectedDay)) {
-                            setState(() {
-                              _selectedDay = selectedDay;
-                              _focusedDay = focusedDay;
-                              _updateSelectedEvents();
-                            });
-                          }
-                        },
-                        onFormatChanged: (format) {
-                          if (_calendarFormat != format) {
-                            setState(() {
-                              _calendarFormat = format;
-                            });
-                          }
-                        },
-                        onPageChanged: (focusedDay) {
-                          _focusedDay = focusedDay;
-                          _loadEvents(); // Load events for the new month
-                        },
-                        calendarStyle: const CalendarStyle(
-                          // Today's decoration
-                          todayDecoration: BoxDecoration(
-                            color: Color(0xFFFFE0B2), // Light amber
-                            shape: BoxShape.circle,
-                          ),
-                          todayTextStyle: TextStyle(
-                            color: Color(0xFF2d2c31),
-                            fontWeight: FontWeight.bold,
-                          ),
+                      selectedTextStyle: TextStyle(color: Colors.white),
 
-                          // Selected day decoration
-                          selectedDecoration: BoxDecoration(
-                            color: Color(0xFFd2982a),
-                            shape: BoxShape.circle,
-                          ),
-                          selectedTextStyle: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      // Today
+                      todayDecoration: BoxDecoration(
+                        color: Color(0x55d2982a), // semi-transparent gold
+                        shape: BoxShape.circle,
+                      ),
+                      todayTextStyle: TextStyle(color: Color(0xFF2d2c31)),
 
-                          // Days with events marker
-                          markersMaxCount: 3,
-                          markerSize: 8.0,
-                          markerDecoration: BoxDecoration(
-                            color: Color(0xFFd2982a),
+                      // Default day
+                      defaultTextStyle: TextStyle(color: Color(0xFF2d2c31)),
+
+                      // Weekend
+                      weekendTextStyle: TextStyle(color: Color(0xFF555555)),
+
+                      // Markers (dots for events)
+                      markersMaxCount: 3,
+                      markerDecoration: BoxDecoration(
+                        color: Color(0xFFd2982a),
+                        shape: BoxShape.circle,
+                      ),
+                      markerSize: 6.0,
+                      markerMargin: EdgeInsets.symmetric(horizontal: 0.5),
+
+                      // Outside days
+                      outsideTextStyle: TextStyle(color: Colors.grey),
+
+                      // Cell margins
+                      cellMargin: EdgeInsets.all(6.0),
+                    ),
+
+                    // Header styling
+                    headerStyle: const HeaderStyle(
+                      titleCentered: true,
+                      formatButtonVisible: true,
+                      formatButtonDecoration: BoxDecoration(
+                        color: Color(0x22d2982a), // very light gold
+                        borderRadius: BorderRadius.all(Radius.circular(12.0)),
+                      ),
+                      formatButtonTextStyle: TextStyle(
+                        color: Color(0xFF2d2c31),
+                      ),
+                      titleTextStyle: TextStyle(
+                        color: Color(0xFF2d2c31),
+                        fontSize: 18.0,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      leftChevronIcon: Icon(
+                        Icons.chevron_left,
+                        color: Color(0xFFd2982a),
+                      ),
+                      rightChevronIcon: Icon(
+                        Icons.chevron_right,
+                        color: Color(0xFFd2982a),
+                      ),
+                    ),
+
+                    // Calendar builders for more customization if needed
+                    calendarBuilders: CalendarBuilders(
+                      // Makes the current day marker more prominent
+                      todayBuilder: (context, date, _) {
+                        return Container(
+                          margin: const EdgeInsets.all(4.0),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color:
+                                date.day == DateTime.now().day
+                                    ? const Color(0x33d2982a)
+                                    : Colors.transparent,
                             shape: BoxShape.circle,
-                          ),
-                        ),
-                        headerStyle: const HeaderStyle(
-                          titleCentered: true,
-                          formatButtonVisible: true,
-                          formatButtonDecoration: BoxDecoration(
-                            color: Color(0xFFFFE0B2),
-                            borderRadius: BorderRadius.all(
-                              Radius.circular(16.0),
+                            border: Border.all(
+                              color: const Color(0xFFd2982a),
+                              width: 1.5,
                             ),
                           ),
-                          formatButtonTextStyle: TextStyle(
-                            color: Color(0xFF2d2c31),
+                          child: Text(
+                            '${date.day}',
+                            style: const TextStyle(
+                              color: Color(0xFF2d2c31),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          titleTextStyle: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                        );
+                      },
+                      // Customize the marker appearance
+                      markerBuilder: (context, date, events) {
+                        if (events.isEmpty) return const SizedBox.shrink();
+
+                        return Positioned(
+                          bottom: 1,
+                          child: Container(
+                            height: 6,
+                            width: events.length > 2 ? 18 : events.length * 6,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFd2982a),
+                              borderRadius: BorderRadius.circular(3.0),
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   ),
-
-                  // Show selected date header
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16.0,
-                      vertical: 8.0,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _selectedDay == null
-                              ? 'No Date Selected'
-                              : DateFormat(
-                                'EEEE, MMMM d, yyyy',
-                              ).format(_selectedDay!),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2d2c31),
-                          ),
-                        ),
-                        Text(
-                          '${_selectedEvents.length} ${_selectedEvents.length == 1 ? 'Event' : 'Events'}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Events list for selected day
+                  const SizedBox(height: 16),
                   Expanded(
                     child:
                         _selectedEvents.isEmpty
@@ -286,195 +491,64 @@ class _CalendarScreenState extends State<CalendarScreen> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.event_busy,
                                     size: 64,
-                                    color: Colors.grey[400],
+                                    color: Colors.grey,
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'No events on this day',
-                                    style: TextStyle(
+                                    'No events scheduled for ${DateFormat('MMMM d, yyyy').format(_selectedDay!)}',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
                                       fontSize: 16,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder:
-                                              (context) =>
-                                                  const SubmitSponsoredEventScreen(),
-                                        ),
-                                      ).then((_) => _loadEvents());
-                                    },
-                                    icon: const Icon(Icons.add_circle),
-                                    label: const Text('Add Event'),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFd2982a),
-                                      foregroundColor: Colors.white,
+                                      color: Colors.grey,
                                     ),
                                   ),
                                 ],
                               ),
                             )
                             : ListView.builder(
-                              padding: const EdgeInsets.all(8.0),
                               itemCount: _selectedEvents.length,
                               itemBuilder: (context, index) {
                                 final event = _selectedEvents[index];
                                 return Card(
-                                  elevation: 2,
                                   margin: const EdgeInsets.symmetric(
-                                    horizontal: 8.0,
+                                    horizontal: 16.0,
                                     vertical: 4.0,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
                                   child: ListTile(
-                                    contentPadding: const EdgeInsets.all(16),
-                                    leading: Container(
-                                      width: 50,
-                                      height: 50,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFE0B2),
-                                        borderRadius: BorderRadius.circular(8),
+                                    leading:
+                                        event.isSponsored
+                                            ? const Icon(
+                                              Icons.star,
+                                              color: Color(0xFFd2982a),
+                                            )
+                                            : const Icon(Icons.event),
+                                    title: Text(
+                                      event.title,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                      child:
-                                          event.imageUrl != null
-                                              ? ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                child: Image.network(
-                                                  event.imageUrl!,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder: (
-                                                    context,
-                                                    error,
-                                                    stackTrace,
-                                                  ) {
-                                                    return const Icon(
-                                                      Icons.event,
-                                                      color: Color(0xFFd2982a),
-                                                      size: 30,
-                                                    );
-                                                  },
-                                                ),
-                                              )
-                                              : const Icon(
-                                                Icons.event,
+                                    ),
+                                    subtitle: Text(
+                                      '${event.startTime}${event.endTime != null ? ' - ${event.endTime}' : ''}\n${event.location}',
+                                    ),
+                                    trailing:
+                                        event.isSponsored
+                                            ? const Text(
+                                              'SPONSORED',
+                                              style: TextStyle(
                                                 color: Color(0xFFd2982a),
-                                                size: 30,
-                                              ),
-                                    ),
-                                    title: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            event.title,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        if (event.isSponsored)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 6,
-                                              vertical: 2,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFd2982a),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: const Text(
-                                              'Sponsored',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 10,
                                                 fontWeight: FontWeight.bold,
+                                                fontSize: 10,
                                               ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.access_time,
-                                              size: 14,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              event.endTime != null
-                                                  ? '${event.startTime} - ${event.endTime}'
-                                                  : event.startTime,
-                                              style: const TextStyle(
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                              Icons.location_on,
-                                              size: 14,
-                                            ),
-                                            const SizedBox(width: 4),
-                                            Expanded(
-                                              child: Text(
-                                                event.location,
-                                                style: const TextStyle(
-                                                  fontSize: 14,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.person, size: 14),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              'By: ${event.organizer}',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.grey[700],
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        if (event.description.isNotEmpty)
-                                          const SizedBox(height: 8),
-                                        if (event.description.isNotEmpty)
-                                          Text(
-                                            event.description,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[700],
-                                            ),
-                                          ),
-                                      ],
-                                    ),
+                                            )
+                                            : null,
+                                    isThreeLine: true,
                                     onTap: () {
-                                      _showEventDetailsDialog(event);
+                                      // Show event details
+                                      _showEventDetails(event);
                                     },
                                   ),
                                 );
@@ -483,77 +557,72 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   ),
                 ],
               ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFFd2982a),
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SubmitSponsoredEventScreen(),
+            ),
+          ).then((_) => _loadEvents());
+        },
+        child: const Icon(Icons.add),
+      ),
     );
   }
 
-  void _showEventDetailsDialog(Event event) {
-    showDialog(
+  void _showEventDetails(Event event) {
+    showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder:
-          (context) => Dialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (event.imageUrl != null)
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                    ),
-                    child: Image.network(
-                      event.imageUrl!,
-                      width: double.infinity,
-                      height: 150,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          height: 120,
-                          color: const Color(0xFFFFE0B2),
-                          child: const Center(
-                            child: Icon(
-                              Icons.event,
-                              size: 60,
-                              color: Color(0xFFd2982a),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  )
-                else
-                  Container(
-                    height: 120,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFFE0B2),
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(16),
-                        topRight: Radius.circular(16),
-                      ),
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.event,
-                        size: 60,
-                        color: Color(0xFFd2982a),
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
+          (context) => DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            maxChildSize: 0.9,
+            minChildSize: 0.5,
+            expand: false,
+            builder: (context, scrollController) {
+              return SingleChildScrollView(
+                controller: scrollController,
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (event.imageUrl != null)
+                        Container(
+                          width: double.infinity,
+                          height: 200,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.network(
+                              event.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder:
+                                  (context, error, stackTrace) => Container(
+                                    color: Colors.grey[300],
+                                    child: const Icon(
+                                      Icons.broken_image,
+                                      size: 60,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                            ),
+                          ),
+                        ),
                       Row(
                         children: [
                           Expanded(
                             child: Text(
                               event.title,
                               style: const TextStyle(
-                                fontSize: 20,
                                 fontWeight: FontWeight.bold,
+                                fontSize: 22,
                               ),
                             ),
                           ),
@@ -561,112 +630,104 @@ class _CalendarScreenState extends State<CalendarScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
-                                vertical: 3,
+                                vertical: 4,
                               ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFd2982a),
-                                borderRadius: BorderRadius.circular(4),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                               child: const Text(
-                                'Sponsored',
+                                'SPONSORED',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 12,
                                   fontWeight: FontWeight.bold,
+                                  fontSize: 10,
                                 ),
                               ),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      _buildDetailRow(
-                        Icons.calendar_today,
-                        DateFormat(
-                          'EEEE, MMMM d, yyyy',
-                        ).format(event.eventDate),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            DateFormat(
+                              'EEEE, MMMM d, yyyy',
+                            ).format(event.eventDate),
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
-                      _buildDetailRow(
-                        Icons.access_time,
-                        event.endTime != null
-                            ? '${event.startTime} - ${event.endTime}'
-                            : event.startTime,
+                      Row(
+                        children: [
+                          const Icon(Icons.access_time, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            event.endTime != null
+                                ? '${event.startTime} - ${event.endTime}'
+                                : event.startTime,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
-                      _buildDetailRow(Icons.location_on, event.location),
-                      const SizedBox(height: 8),
-                      _buildDetailRow(
-                        Icons.business,
-                        'Organized by: ${event.organizer}',
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              event.location,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       const Text(
                         'Description',
                         style: TextStyle(
-                          fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          fontSize: 18,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        event.description.isNotEmpty
-                            ? event.description
-                            : 'No description provided.',
-                        style: const TextStyle(fontSize: 14),
+                        event.description,
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Organized by: ${event.organizer}',
+                        style: const TextStyle(
+                          fontStyle: FontStyle.italic,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFd2982a),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('Close'),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const Divider(),
-                OverflowBar(
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text(
-                        'Close',
-                        style: TextStyle(color: Color(0xFFd2982a)),
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        // Call a method to add event to user's personal calendar
-                        _addToPersonalCalendar(event);
-                      },
-                      icon: const Icon(Icons.calendar_today, size: 16),
-                      label: const Text('Add to My Calendar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFd2982a),
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              );
+            },
           ),
-    );
-  }
-
-  Widget _buildDetailRow(IconData icon, String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: const Color(0xFFd2982a)),
-        const SizedBox(width: 8),
-        Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
-      ],
-    );
-  }
-
-  void _addToPersonalCalendar(Event event) {
-    // This would be implemented with a platform-specific calendar integration
-    // For now, just show a success message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Event added to your calendar'),
-        backgroundColor: Color(0xFFd2982a),
-      ),
     );
   }
 }

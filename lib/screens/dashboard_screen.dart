@@ -2,16 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:news_app/services/news_service.dart';
 import 'package:news_app/models/article.dart';
 import 'package:news_app/widgets/news_card_mini.dart';
-import 'package:news_app/screens/web_view_screen.dart';
 import 'package:news_app/services/weather_service.dart';
-import 'package:news_app/models/weather_forecast.dart' as weather_forecast; // Update import to use 'as' to avoid conflictsas weather_forecast; // Update import to use 'as' to avoid conflicts
+import 'package:news_app/models/weather_forecast.dart' as weather_forecast;
 import 'package:news_app/screens/weather_screen.dart';
 import 'package:news_app/screens/home_screen.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:news_app/widgets/news_search_delegate.dart'
     as news_search_delegate; // Add this import
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:news_app/screens/local_news_screen.dart';
 import 'package:news_app/screens/politics_screen.dart';
 import 'package:news_app/screens/sports_screen.dart';
@@ -25,8 +22,12 @@ import 'package:news_app/screens/submit_sponsored_article.dart';
 import 'package:news_app/screens/profile_screen.dart';
 import 'package:news_app/screens/edit_profile_screen.dart';
 import 'package:news_app/screens/settings_screen.dart';
-import 'package:news_app/screens/article_detail_screen.dart';
 import 'package:news_app/screens/calendar_screen.dart';
+import 'package:news_app/models/event.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
+import 'package:news_app/services/event_service.dart';
+import 'package:news_app/widgets/webview_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -38,6 +39,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   final NewsService _newsService = NewsService();
   final WeatherService _weatherService = WeatherService();
+  final EventService _eventService = EventService();
   List<Article> _localNews = [];
   List<Article> _sportsNews = [];
   List<Article> _columnsNews = [];
@@ -46,6 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Article> _publicNoticesNews = [];
   List<Article> _politicsNews = [];
   List<weather_forecast.WeatherForecast> _forecasts = [];
+  List<Event> _upcomingEvents = [];
   bool _isLoading = true;
 
   // Add selected tab index
@@ -83,6 +86,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'https://www.ncpoliticalnews.com/news?format=rss',
         ),
         _weatherService.getForecast(),
+        _eventService.getUpcomingEvents(), // Use EventService here
       ]);
 
       if (mounted) {
@@ -96,6 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _publicNoticesNews = results[5] as List<Article>;
           _politicsNews = results[6] as List<Article>;
           _forecasts = results[7] as List<weather_forecast.WeatherForecast>;
+          _upcomingEvents = results[8] as List<Event>;
           _isLoading = false;
         });
 
@@ -104,7 +109,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           'Politics: ${_politicsNews.length}, '
           'Columns: ${_columnsNews.length}, Classifieds: ${_classifiedsNews.length}, '
           'Obituaries: ${_obituariesNews.length}, Public Notices: ${_publicNoticesNews.length}, '
-          'Weather Forecasts: ${_forecasts.length}',
+          'Weather Forecasts: ${_forecasts.length}, '
+          'Upcoming Events: ${_upcomingEvents.length}',
         );
       }
     } catch (e) {
@@ -122,10 +128,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Create a stateless widget for the Weather tab content
   Widget _buildWeatherTab() {
-    return WeatherTab(
-      weatherService: _weatherService,
-      forecasts: _forecasts,
-    );
+    return WeatherTab(weatherService: _weatherService, forecasts: _forecasts);
   }
 
   @override
@@ -162,35 +165,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       // Add drawer
       drawer: _buildDrawer(context),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFd2982a)),
-            )
-          : PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(), // Disable swiping
-              onPageChanged: (index) {
-                setState(() {
-                  _selectedIndex = index;
-                });
-              },
-              children: [
-                // Home/Dashboard tab
-                _buildDashboardContent(),
+      body:
+          _isLoading
+              ? const Center(
+                child: CircularProgressIndicator(color: Color(0xFFd2982a)),
+              )
+              : PageView(
+                controller: _pageController,
+                physics:
+                    const NeverScrollableScrollPhysics(), // Disable swiping
+                onPageChanged: (index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
+                },
+                children: [
+                  // Home/Dashboard tab
+                  _buildDashboardContent(),
 
-                // News tab
-                const HomeScreen(),
+                  // News tab
+                  const HomeScreen(),
 
-                // Weather tab - inline weather content
-                WeatherTab(
-                  weatherService: _weatherService,
-                  forecasts: _forecasts,
-                ),
+                  // Weather tab - inline weather content
+                  WeatherTab(
+                    weatherService: _weatherService,
+                    forecasts: _forecasts,
+                  ),
 
-                // Calendar tab
-                const CalendarScreen(),
-              ],
-            ),
+                  // Calendar tab
+                  const CalendarScreen(),
+                ],
+              ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white,
         elevation: 8.0,
@@ -261,6 +266,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
               },
             ),
             _buildNewsSlider(_sportsNews),
+
+            // Add the Events section here
+            _buildSectionHeader(
+              'Upcoming Events',
+              onSeeAllPressed: () {
+                setState(() {
+                  _selectedIndex = 3; // Switch to calendar tab
+                  _pageController.jumpToPage(3);
+                });
+              },
+            ),
+            _buildEventSlider(_upcomingEvents),
 
             // Politics News section
             _buildSectionHeader(
@@ -466,6 +483,155 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.pushNamed(context, '/article', arguments: article);
   }
 
+  // Add this method to build the event slider
+  Widget _buildEventSlider(List<Event> events) {
+    return SizedBox(
+      height: 160, // Adjusted height for the event slider
+      child:
+          events.isEmpty
+              ? const Center(child: Text('No upcoming events'))
+              : ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: events.length,
+                itemBuilder: (context, index) {
+                  final event = events[index];
+                  return Card(
+                    margin: const EdgeInsets.all(8),
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      side:
+                          event.isSponsored
+                              ? const BorderSide(
+                                color: Color(0xFFd2982a),
+                                width: 1.5,
+                              )
+                              : BorderSide.none,
+                    ),
+                    child: InkWell(
+                      onTap: () => _showEventDetails(event),
+                      child: Container(
+                        width: 180,
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Date and sponsor badge row
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.event,
+                                  size: 16,
+                                  color: const Color(0xFFd2982a),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  DateFormat('MMM d').format(event.eventDate),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const Spacer(),
+                                if (event.isSponsored)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFd2982a),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      'SPONSORED',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Title with ellipsis
+                            Text(
+                              event.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Location with icon
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 14,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    event.location,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            // Time with icon
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.access_time,
+                                  size: 14,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  event.startTime,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+    );
+  }
+
+  // Add this method to show event details
+  void _showEventDetails(Event event) {
+    // Navigate to calendar and pass the event date to focus on
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CalendarScreen(selectedDate: event.eventDate),
+      ),
+    );
+  }
+
   // Add this method for building the drawer
   Widget _buildDrawer(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -483,13 +649,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Header with logo and greeting
           Container(
             padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
-            color: const Color(0xFFd2982a),
+            color: Colors.white,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Logo image instead of avatar
                 Image.asset(
-                  'assets/images/logo.png',
+                  'assets/images/header.png',
                   height: 60,
                   fit: BoxFit.contain,
                 ),
@@ -587,6 +753,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const PoliticsScreen()),
+              );
+            },
+          ),
+
+          // Add Order Classifieds option here
+          ListTile(
+            leading: const Icon(Icons.shopping_cart, color: Color(0xFFd2982a)),
+            title: const Text('Order Classifieds'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (context) => const WebViewScreen(
+                        url: 'https://www.neusenews.com/order-classifieds',
+                        title: 'Order Classifieds',
+                      ),
+                ),
               );
             },
           ),
@@ -778,7 +963,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 // Create a stateless widget for the Weather tab content
 class WeatherTab extends StatelessWidget {
   final WeatherService weatherService;
-  final List<weather_forecast.WeatherForecast> forecasts;ecast> forecasts;
+  final List<weather_forecast.WeatherForecast> forecasts;
 
   const WeatherTab({
     super.key,
@@ -829,7 +1014,6 @@ class WeatherTab extends StatelessWidget {
                       },
                     ),
           ),
-          // View detailed weather button
           Align(
             alignment: Alignment.center,
             child: ElevatedButton(

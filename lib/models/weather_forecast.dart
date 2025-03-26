@@ -3,10 +3,10 @@ class WeatherForecast {
   final String day;
   final String condition;
   final double temp;
-  final String icon;
   final double tempMin;
   final double tempMax;
-  final double pop; // Probability of precipitation
+  final String icon;
+  final double pop; // Precipitation probability
   final double uvIndex;
 
   WeatherForecast({

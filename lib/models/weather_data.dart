@@ -40,35 +40,4 @@ class WeatherData {
       sunset: json['sys']['sunset'],
     );
   }
-
-  String get weatherImage {
-    switch (condition.toLowerCase()) {
-      case 'clear':
-        return 'assets/images/weather/Clear.jpeg';
-      case 'clouds':
-      case 'few clouds':
-      case 'scattered clouds':
-      case 'broken clouds':
-        return 'assets/images/weather/Cloudy.jpeg';
-      case 'rain':
-      case 'shower rain':
-      case 'light rain':
-      case 'moderate rain':
-      case 'drizzle':
-        return 'assets/images/weather/Rain.jpeg';
-      case 'thunderstorm':
-        return 'assets/images/weather/Thunder.jpeg';
-      case 'snow':
-      case 'light snow':
-      case 'heavy snow':
-        return 'assets/images/weather/Snow.jpeg';
-      case 'mist':
-      case 'fog':
-      case 'haze':
-      case 'smoke':
-        return 'assets/images/weather/Fog.jpeg';
-      default:
-        return 'assets/images/weather/Default.jpeg';
-    }
-  }
 }

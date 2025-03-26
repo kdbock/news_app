@@ -3,9 +3,8 @@ import 'package:flutter/services.dart'; // Add this import for SystemChrome
 import 'package:news_app/services/news_service.dart';
 import 'package:news_app/models/article.dart';
 import 'package:news_app/widgets/news_card.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:url_launcher/url_launcher.dart'; // Make sure this is in pubspec.yaml
-import 'package:news_app/screens/dashboard_screen.dart'; // Add this import
+// Make sure this is in pubspec.yaml
+// Add this import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

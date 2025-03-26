@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:news_app/models/article.dart';
-import 'package:news_app/screens/web_view_screen.dart';
-import 'package:news_app/screens/article_detail_screen.dart';
 
 class NewsCard extends StatelessWidget {
   final Article article;
