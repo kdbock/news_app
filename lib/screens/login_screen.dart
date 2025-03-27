@@ -3,11 +3,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 import 'package:news_app/services/auth_service.dart';
-// Add this import
-// import 'package:sign_in_with_apple/sign_in_with_apple.dart';  // Comment out temporarily
+import 'package:provider/provider.dart';
+// First, add proper import for app_auth
+import 'package:news_app/providers/auth_provider.dart' as app_auth;
 
+// Add initialTab parameter to constructor
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  final int initialTab;
+  
+  const AuthScreen({super.key, this.initialTab = 0});
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -56,6 +60,7 @@ class _AuthScreenState extends State<AuthScreen>
     _tabController = TabController(
       length: 2,
       vsync: this,
+      initialIndex: widget.initialTab,
     ); // Login + Register tabs
   }
 
@@ -80,20 +85,20 @@ class _AuthScreenState extends State<AuthScreen>
 
     setState(() => _isLoading = true);
     try {
-      print("Attempting login with email: ${_emailController.text.trim()}");
+      debugPrint("Attempting login with email: ${_emailController.text.trim()}");
       final user = await _authService.login(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
 
-      print("Login completed, user: $user");
+      debugPrint("Login completed, user: $user");
       if (mounted) {
         // Try both navigation approaches to identify which works
-        print("Navigating to home screen");
+        debugPrint("Navigating to home screen");
         Navigator.pushReplacementNamed(context, '/home');
       }
     } catch (e) {
-      print("Error during login: $e");
+      debugPrint("Error during login: $e");
       setState(() => _errorMessage = "Login failed: $e");
     } finally {
       if (mounted) {
@@ -137,7 +142,7 @@ class _AuthScreenState extends State<AuthScreen>
 
   Future<void> _saveUserData(String userId) async {
     // Implement Firestore/Database save here
-    print('Saving user data for $userId');
+    debugPrint('Saving user data for $userId');
   }
 
   Future<void> _signInWithGoogle() async {
@@ -277,21 +282,44 @@ class _AuthScreenState extends State<AuthScreen>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed:
-                      _isLoading
-                          ? null
-                          : _tempNavigateToHome, // Just use the method directly
+                  onPressed: _isLoading
+                      ? null
+                      : () async {
+                          try {
+                            setState(() => _isLoading = true);
+
+                            await Provider.of<app_auth.AuthProvider>(
+                              context,
+                              listen: false,
+                            ).signInWithEmailAndPassword(
+                              _emailController.text,
+                              _passwordController.text,
+                            );
+
+                            // Add mounted check before using context
+                            if (mounted) {
+                              Navigator.pushReplacementNamed(
+                                  context, '/dashboard');
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              setState(() => _isLoading = false);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Login failed: $e')),
+                              );
+                            }
+                          }
+                        },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     backgroundColor: const Color(0xFFd2982a), // Gold
                   ),
-                  child:
-                      _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                            'LOGIN',
-                            style: TextStyle(color: Colors.white),
-                          ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'LOGIN',
+                          style: TextStyle(color: Colors.white),
+                        ),
                 ),
               ),
               _buildSocialButtons(),
@@ -583,13 +611,12 @@ class _AuthScreenState extends State<AuthScreen>
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     backgroundColor: const Color(0xFFd2982a), // Gold
                   ),
-                  child:
-                      _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                            'REGISTER',
-                            style: TextStyle(color: Colors.white),
-                          ),
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'REGISTER',
+                          style: TextStyle(color: Colors.white),
+                        ),
                 ),
               ),
               _buildSocialButtons(),

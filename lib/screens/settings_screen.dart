@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart'; // For FilteringTextInputFormatter and LengthLimitingTextInputFormatter
+// For launchUrl and LaunchMode
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -53,114 +54,140 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _loadSettings();
+    _getAppVersion();
+  }
+
+  Future<void> _getAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      setState(() {
+        _appVersion = packageInfo.version;
+        _buildNumber = packageInfo.buildNumber;
+      });
+    } catch (e) {
+      debugPrint('Error getting package info: $e');
+      setState(() {
+        _appVersion = '1.0.0';
+        _buildNumber = '1';
+      });
+    }
   }
 
   Future<void> _loadSettings() async {
     setState(() => _isLoading = true);
 
     try {
-      // Load app version
-      final packageInfo = await PackageInfo.fromPlatform();
-      _appVersion = packageInfo.version;
-      _buildNumber = packageInfo.buildNumber;
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('Not logged in');
 
-      // Load saved preferences
-      final prefs = await SharedPreferences.getInstance();
+      // Load user settings from Firestore
+      final userSettings =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .collection('settings')
+              .doc('preferences')
+              .get();
 
-      setState(() {
-        // Notification settings
-        _pushNotificationsEnabled =
-            prefs.getBool('pushNotificationsEnabled') ?? true;
-        _breakingNewsAlerts = prefs.getBool('breakingNewsAlerts') ?? true;
-        _dailyDigestNotifications =
-            prefs.getBool('dailyDigestNotifications') ?? true;
-        _sportScoreNotifications =
-            prefs.getBool('sportScoreNotifications') ?? false;
-        _weatherAlerts = prefs.getBool('weatherAlerts') ?? true;
-        _localNewsAlerts = prefs.getBool('localNewsAlerts') ?? true;
+      if (userSettings.exists) {
+        final data = userSettings.data()!;
 
-        // Content preferences
-        _showLocalNews = prefs.getBool('showLocalNews') ?? true;
-        _showPolitics = prefs.getBool('showPolitics') ?? true;
-        _showSports = prefs.getBool('showSports') ?? true;
-        _showClassifieds = prefs.getBool('showClassifieds') ?? true;
-        _showObituaries = prefs.getBool('showObituaries') ?? true;
-        _showWeather = prefs.getBool('showWeather') ?? true;
-        _locationPreference =
-            prefs.getString('locationPreference') ?? 'Current Location';
+        setState(() {
+          // Notification settings
+          _pushNotificationsEnabled = data['pushNotificationsEnabled'] ?? true;
+          _breakingNewsAlerts = data['breakingNewsAlerts'] ?? true;
+          _dailyDigestNotifications = data['dailyDigestNotifications'] ?? true;
+          _sportScoreNotifications = data['sportScoreNotifications'] ?? false;
+          _weatherAlerts = data['weatherAlerts'] ?? true;
+          _localNewsAlerts = data['localNewsAlerts'] ?? true;
 
-        // Display settings
-        _textSize = prefs.getString('textSize') ?? 'Medium';
-        _darkModeEnabled = prefs.getBool('darkModeEnabled') ?? false;
-        _reducedMotion = prefs.getBool('reducedMotion') ?? false;
-        _highContrastMode = prefs.getBool('highContrastMode') ?? false;
+          // Content preferences
+          _showLocalNews = data['showLocalNews'] ?? true;
+          _showPolitics = data['showPolitics'] ?? true;
+          _showSports = data['showSports'] ?? true;
+          _showClassifieds = data['showClassifieds'] ?? true;
+          _showObituaries = data['showObituaries'] ?? true;
+          _showWeather = data['showWeather'] ?? true;
+          _locationPreference =
+              data['locationPreference'] ?? 'Current Location';
 
-        // Privacy settings
-        _locationPermission = prefs.getBool('locationPermission') ?? true;
-        _analyticsEnabled = prefs.getBool('analyticsEnabled') ?? true;
-        _adPersonalization = prefs.getBool('adPersonalization') ?? false;
-        _allowCookies = prefs.getBool('allowCookies') ?? true;
+          // Display settings
+          _textSize = data['textSize'] ?? 'Medium';
+          _darkModeEnabled = data['darkModeEnabled'] ?? false;
+          _reducedMotion = data['reducedMotion'] ?? false;
+          _highContrastMode = data['highContrastMode'] ?? false;
 
-        // Last data sync time
-        final lastSyncTimeMillis = prefs.getInt('lastDataSync');
-        if (lastSyncTimeMillis != null) {
-          _lastDataSync = DateTime.fromMillisecondsSinceEpoch(
-            lastSyncTimeMillis,
-          );
-        }
-      });
+          // Privacy settings
+          _locationPermission = data['locationPermission'] ?? true;
+          _analyticsEnabled = data['analyticsEnabled'] ?? true;
+          _adPersonalization = data['adPersonalization'] ?? false;
+          _allowCookies = data['allowCookies'] ?? true;
+
+          // Last data sync time
+          final lastSyncTimeMillis = data['lastDataSync'];
+          if (lastSyncTimeMillis != null) {
+            _lastDataSync = DateTime.fromMillisecondsSinceEpoch(
+              lastSyncTimeMillis,
+            );
+          }
+        });
+      }
+
+      setState(() => _isLoading = false);
     } catch (e) {
       debugPrint('Error loading settings: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      setState(() => _isLoading = false);
     }
   }
 
   Future<void> _saveSettings() async {
+    setState(() => _isLoading = true);
+
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('Not logged in');
 
-      // Notification settings
-      await prefs.setBool(
-        'pushNotificationsEnabled',
-        _pushNotificationsEnabled,
-      );
-      await prefs.setBool('breakingNewsAlerts', _breakingNewsAlerts);
-      await prefs.setBool(
-        'dailyDigestNotifications',
-        _dailyDigestNotifications,
-      );
-      await prefs.setBool('sportScoreNotifications', _sportScoreNotifications);
-      await prefs.setBool('weatherAlerts', _weatherAlerts);
-      await prefs.setBool('localNewsAlerts', _localNewsAlerts);
+      // Save user settings to Firestore
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('settings')
+          .doc('preferences')
+          .set({
+            // Notification settings
+            'pushNotificationsEnabled': _pushNotificationsEnabled,
+            'breakingNewsAlerts': _breakingNewsAlerts,
+            'dailyDigestNotifications': _dailyDigestNotifications,
+            'sportScoreNotifications': _sportScoreNotifications,
+            'weatherAlerts': _weatherAlerts,
+            'localNewsAlerts': _localNewsAlerts,
 
-      // Content preferences
-      await prefs.setBool('showLocalNews', _showLocalNews);
-      await prefs.setBool('showPolitics', _showPolitics);
-      await prefs.setBool('showSports', _showSports);
-      await prefs.setBool('showClassifieds', _showClassifieds);
-      await prefs.setBool('showObituaries', _showObituaries);
-      await prefs.setBool('showWeather', _showWeather);
-      await prefs.setString('locationPreference', _locationPreference);
+            // Content preferences
+            'showLocalNews': _showLocalNews,
+            'showPolitics': _showPolitics,
+            'showSports': _showSports,
+            'showClassifieds': _showClassifieds,
+            'showObituaries': _showObituaries,
+            'showWeather': _showWeather,
+            'locationPreference': _locationPreference,
 
-      // Display settings
-      await prefs.setString('textSize', _textSize);
-      await prefs.setBool('darkModeEnabled', _darkModeEnabled);
-      await prefs.setBool('reducedMotion', _reducedMotion);
-      await prefs.setBool('highContrastMode', _highContrastMode);
+            // Display settings
+            'textSize': _textSize,
+            'darkModeEnabled': _darkModeEnabled,
+            'reducedMotion': _reducedMotion,
+            'highContrastMode': _highContrastMode,
 
-      // Privacy settings
-      await prefs.setBool('locationPermission', _locationPermission);
-      await prefs.setBool('analyticsEnabled', _analyticsEnabled);
-      await prefs.setBool('adPersonalization', _adPersonalization);
-      await prefs.setBool('allowCookies', _allowCookies);
+            // Privacy settings
+            'locationPermission': _locationPermission,
+            'analyticsEnabled': _analyticsEnabled,
+            'adPersonalization': _adPersonalization,
+            'allowCookies': _allowCookies,
 
-      // Update sync time
-      final now = DateTime.now();
-      await prefs.setInt('lastDataSync', now.millisecondsSinceEpoch);
-      setState(() => _lastDataSync = now);
+            // Update sync time
+            'lastDataSync': DateTime.now().millisecondsSinceEpoch,
+          });
+
+      setState(() => _lastDataSync = DateTime.now());
 
       ScaffoldMessenger.of(
         context,
@@ -169,6 +196,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error saving settings: $e')));
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 

@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:io';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
 
 class EditProfileScreen extends StatefulWidget {
   final String firstName;
@@ -13,6 +18,7 @@ class EditProfileScreen extends StatefulWidget {
   final bool dailyDigest;
   final bool sportsNewsletter;
   final bool politicalNewsletter;
+  final String? profileImageUrl;
 
   const EditProfileScreen({
     super.key,
@@ -26,6 +32,7 @@ class EditProfileScreen extends StatefulWidget {
     required this.dailyDigest,
     required this.sportsNewsletter,
     required this.politicalNewsletter,
+    this.profileImageUrl,
   });
 
   @override
@@ -36,8 +43,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   bool _isLoading = false;
+  final bool _isSaving = false;
   String _errorMessage = '';
   DateTime? _selectedDate;
+  File? _imageFile;
+  String? _profileImageUrl;
+  bool _isUploading = false;
 
   // Form controllers
   late TextEditingController _firstNameController;
@@ -76,6 +87,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         // If parsing fails, keep _selectedDate as null
       }
     }
+
+    // Initialize existing profile image
+    _profileImageUrl = widget.profileImageUrl;
   }
 
   @override
@@ -106,6 +120,106 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedFile == null) {
+        return;
+      }
+
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+    }
+  }
+
+  Future<String?> _uploadProfileImage(String userId) async {
+    if (_imageFile == null) return _profileImageUrl;
+
+    try {
+      setState(() => _isUploading = true);
+
+      // Create file reference
+      final fileName =
+          '${userId}_${DateTime.now().millisecondsSinceEpoch}${path.extension(_imageFile!.path)}';
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('profile_images')
+          .child(fileName);
+
+      // Upload file
+      final uploadTask = ref.putFile(_imageFile!);
+      final snapshot = await uploadTask.whenComplete(() {});
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+
+      setState(() => _isUploading = false);
+      return downloadUrl;
+    } catch (e) {
+      setState(() => _isUploading = false);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error uploading image: $e')));
+      return null;
+    }
+  }
+
+  Future<void> _showImagePickerOptions() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.photo_camera),
+                title: const Text('Take a photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library),
+                title: const Text('Choose from gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (_profileImageUrl != null || _imageFile != null)
+                ListTile(
+                  leading: const Icon(Icons.delete, color: Colors.red),
+                  title: const Text(
+                    'Remove photo',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _imageFile = null;
+                      _profileImageUrl = null;
+                    });
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -115,6 +229,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final user = _auth.currentUser;
 
       if (user != null) {
+        // Upload image if changed
+        final imageUrl = await _uploadProfileImage(user.uid);
+
         // Update display name in Firebase Auth
         await user.updateDisplayName(
           '${_firstNameController.text} ${_lastNameController.text}',
@@ -126,8 +243,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           await user.updateEmail(_emailController.text);
         }
 
-        // In a real app, save additional profile data to Firestore
-        // For this example, we'll just show a success message
+        // Update Firestore user document
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(FirebaseAuth.instance.currentUser?.uid)
+            .update({
+              'firstName': _firstNameController.text,
+              'lastName': _lastNameController.text,
+              'phone': _phoneController.text,
+              'zipCode': _zipCodeController.text,
+              'birthday': _birthdayController.text,
+              'textAlerts': _textAlerts,
+              'dailyDigest': _dailyDigest,
+              'sportsNewsletter': _sportsNewsletter,
+              'politicalNewsletter': _politicalNewsletter,
+              'profileImageUrl': imageUrl,
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -189,44 +321,59 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // User avatar editor
+              // Profile image section
               Center(
-                child: Column(
+                child: Stack(
                   children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: const Color(0xFFd2982a),
-                      child: Text(
-                        _firstNameController.text.isNotEmpty
-                            ? _firstNameController.text[0].toUpperCase()
-                            : 'U',
-                        style: const TextStyle(
-                          fontSize: 40,
+                    // Profile image
+                    GestureDetector(
+                      onTap: _showImagePickerOptions,
+                      child: CircleAvatar(
+                        radius: 60,
+                        backgroundColor: const Color(
+                          0xFFd2982a,
+                        ).withOpacity(0.2),
+                        backgroundImage: _getProfileImage(),
+                        child: _getProfileImagePlaceholder(),
+                      ),
+                    ),
+
+                    // Edit button
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFd2982a),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit,
                           color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                          size: 20,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    TextButton.icon(
-                      onPressed: () {
-                        // In a real app, this would open an image picker
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Profile picture upload coming soon'),
+
+                    // Loading indicator overlay
+                    if (_isUploading)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            shape: BoxShape.circle,
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.camera_alt, size: 18),
-                      label: const Text('Change Profile Photo'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFFd2982a),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
-
               const SizedBox(height: 24),
 
               if (_errorMessage.isNotEmpty)
@@ -263,7 +410,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       decoration: const InputDecoration(
                         labelText: 'First Name*',
                       ),
-                      validator: (value) => value!.isEmpty ? 'Required' : null,
+                      validator:
+                          (value) => value!.isNotEmpty ? null : 'Required',
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -273,7 +421,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Last Name*',
                       ),
-                      validator: (value) => value!.isEmpty ? 'Required' : null,
+                      validator:
+                          (value) => value!.isNotEmpty ? null : 'Required',
                     ),
                   ),
                 ],
@@ -287,13 +436,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 keyboardType: TextInputType.emailAddress,
                 validator:
                     (value) =>
-                        value!.isEmpty
-                            ? 'Required'
-                            : !RegExp(
-                              r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                            ).hasMatch(value)
-                            ? 'Enter a valid email'
-                            : null,
+                        value!.isNotEmpty
+                            ? !RegExp(
+                                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                ).hasMatch(value)
+                                ? 'Enter a valid email'
+                                : null
+                            : 'Required',
               ),
 
               const SizedBox(height: 16),
@@ -302,7 +451,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 controller: _phoneController,
                 decoration: const InputDecoration(labelText: 'Phone Number*'),
                 keyboardType: TextInputType.phone,
-                validator: (value) => value!.isEmpty ? 'Required' : null,
+                validator: (value) => value!.isNotEmpty ? null : 'Required',
               ),
 
               const SizedBox(height: 16),
@@ -313,11 +462,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 keyboardType: TextInputType.number,
                 validator:
                     (value) =>
-                        value!.isEmpty
-                            ? 'Required'
-                            : value.length != 5
-                            ? 'Enter a valid 5-digit ZIP code'
-                            : null,
+                        value!.isNotEmpty
+                            ? value.length != 5
+                                ? 'Enter a valid 5-digit ZIP code'
+                                : null
+                            : 'Required',
               ),
 
               const SizedBox(height: 16),
@@ -416,6 +565,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
     );
+  }
+
+  ImageProvider? _getProfileImage() {
+    if (_imageFile != null) {
+      return FileImage(_imageFile!);
+    } else if (_profileImageUrl != null) {
+      return NetworkImage(_profileImageUrl!);
+    }
+    return null;
+  }
+
+  Widget? _getProfileImagePlaceholder() {
+    if (_imageFile == null && _profileImageUrl == null) {
+      return const Icon(Icons.person, size: 60, color: Color(0xFFd2982a));
+    }
+    return null;
   }
 
   Widget _buildSectionHeader(String title) {

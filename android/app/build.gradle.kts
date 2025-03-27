@@ -45,6 +45,8 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     // Add desugar tools
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    // Add AppCompat dependency for Stripe
+    implementation("androidx.appcompat:appcompat:1.6.1")
 }
 
 flutter {

@@ -1,3 +1,4 @@
+import 'dart:developer'; // For logging instead of print
 import 'package:flutter/material.dart';
 import 'package:news_app/services/news_service.dart';
 import 'package:news_app/models/article.dart';
@@ -9,7 +10,7 @@ import 'package:news_app/screens/home_screen.dart';
 import 'package:news_app/widgets/news_search_delegate.dart'
     as news_search_delegate;
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // Add this import
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:news_app/screens/local_news_screen.dart';
 import 'package:news_app/screens/politics_screen.dart';
 import 'package:news_app/screens/sports_screen.dart';
@@ -21,13 +22,17 @@ import 'package:news_app/screens/submit_news_tip.dart';
 import 'package:news_app/screens/submit_sponsored_event.dart';
 import 'package:news_app/screens/submit_sponsored_article.dart';
 import 'package:news_app/screens/profile_screen.dart';
-import 'package:news_app/screens/edit_profile_screen.dart';
 import 'package:news_app/screens/settings_screen.dart';
 import 'package:news_app/screens/calendar_screen.dart';
 import 'package:news_app/models/event.dart';
 import 'package:intl/intl.dart';
 import 'package:news_app/services/event_service.dart';
 import 'package:news_app/widgets/webview_screen.dart';
+import 'package:news_app/screens/admin_review_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:news_app/providers/auth_provider.dart' as app_auth;
+import 'package:url_launcher/url_launcher.dart'; // Import for launchUrl
+import 'package:news_app/widgets/app_drawer.dart'; // Add this import
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -49,7 +54,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Article> _politicsNews = [];
   List<weather_forecast.WeatherForecast> _forecasts = [];
   List<Event> _upcomingEvents = [];
-  List<Article> _sponsoredArticles = []; // Add this line
+  List<Article> _sponsoredArticles = [];
   bool _isLoading = true;
 
   // Add selected tab index
@@ -73,11 +78,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'publicNotices': GlobalKey(),
   };
 
+  // Add these variables to the _DashboardScreenState class:
+  bool _isAdmin = false;
+  bool _isContributor = false;
+  bool _isInvestor = false;
+
+  // Define the _checkUserRoles method
+  Future<void> _checkUserRoles() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          final data = userDoc.data()!;
+          setState(() {
+            _isAdmin = data['isAdmin'] ?? false;
+            _isContributor = data['isContributor'] ?? false;
+            _isInvestor = data['isInvestor'] ?? false;
+          });
+        }
+      }
+    } catch (e) {
+      log('Error checking user roles: $e');
+    }
+  }
+
+  // Add this at the top of _DashboardScreenState class
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
   @override
   void initState() {
     super.initState();
     _loadDashboardData();
     _pageController = PageController(initialPage: 0);
+
+    // Add this Firebase auth listener
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      log(
+        "Auth state changed: User ${user != null ? 'logged in' : 'logged out'}",
+      );
+      _checkUserRoles(); // Add this method to update user roles
+    });
+
+    // Refresh user data when dashboard loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<app_auth.AuthProvider>(
+        context,
+        listen: false,
+      ).refreshUserData();
+      _checkUserRoles(); // Check user roles explicitly here too
+    });
   }
 
   @override
@@ -91,51 +145,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Load data in parallel for better performance
-      final results = await Future.wait([
-        _newsService.fetchLocalNews(),
-        _newsService.fetchSports(),
-        _newsService.fetchColumns(),
-        _newsService.fetchClassifieds(),
-        _newsService.fetchObituaries(),
-        _newsService.fetchPublicNotices(),
-        _newsService.fetchNewsByUrl(
-          'https://www.ncpoliticalnews.com/news?format=rss',
-        ),
-        _weatherService.getForecast(),
-        _eventService.getUpcomingEvents(), // Use EventService here
-        _fetchSponsoredArticles(), // Add this line
-      ]);
+      List<dynamic> results = [];
+
+      try {
+        // Load data in parallel for better performance
+        results = await Future.wait([
+          _newsService.fetchLocalNews(),
+          _newsService.fetchSports(),
+          _newsService.fetchColumns(),
+          _newsService.fetchClassifieds(),
+          _newsService.fetchObituaries(),
+          _newsService.fetchPublicNotices(),
+          _newsService.fetchNewsByUrl(
+            'https://www.ncpoliticalnews.com/news?format=rss',
+          ),
+          _weatherService.getForecast(),
+          _eventService.getUpcomingEvents(),
+          _fetchSponsoredArticles(), // This might throw an exception
+        ]);
+      } catch (e) {
+        log('Error in one of the data fetches: $e');
+        // Continue with the function, we'll handle missing data
+      }
 
       if (mounted) {
         setState(() {
-          // Cast the results to the correct types
-          _localNews = results[0] as List<Article>;
-          _sportsNews = results[1] as List<Article>;
-          _columnsNews = results[2] as List<Article>;
-          _classifiedsNews = results[3] as List<Article>;
-          _obituariesNews = results[4] as List<Article>;
-          _publicNoticesNews = results[5] as List<Article>;
-          _politicsNews = results[6] as List<Article>;
-          _forecasts = results[7] as List<weather_forecast.WeatherForecast>;
-          _upcomingEvents = results[8] as List<Event>;
-          _sponsoredArticles = results[9] as List<Article>; // Add this line
+          // Safely cast the results, handling possible missing data
+          _localNews = results.isNotEmpty ? results[0] as List<Article> : [];
+          _sportsNews = results.length > 1 ? results[1] as List<Article> : [];
+          _columnsNews = results.length > 2 ? results[2] as List<Article> : [];
+          _classifiedsNews =
+              results.length > 3 ? results[3] as List<Article> : [];
+          _obituariesNews =
+              results.length > 4 ? results[4] as List<Article> : [];
+          _publicNoticesNews =
+              results.length > 5 ? results[5] as List<Article> : [];
+          _politicsNews = results.length > 6 ? results[6] as List<Article> : [];
+          _forecasts =
+              results.length > 7
+                  ? results[7] as List<weather_forecast.WeatherForecast>
+                  : [];
+          _upcomingEvents = results.length > 8 ? results[8] as List<Event> : [];
+
+          // Handle sponsored articles separately since it's most likely to fail
+          _sponsoredArticles =
+              results.length > 9 ? results[9] as List<Article> : [];
+
           _isLoading = false;
         });
 
-        // Update debug print to include sponsored articles
-        debugPrint(
-          'Loaded feeds - Local: ${_localNews.length}, Sports: ${_sportsNews.length}, '
-          'Politics: ${_politicsNews.length}, '
-          'Columns: ${_columnsNews.length}, Classifieds: ${_classifiedsNews.length}, '
-          'Obituaries: ${_obituariesNews.length}, Public Notices: ${_publicNoticesNews.length}, '
-          'Sponsored Articles: ${_sponsoredArticles.length}, '
-          'Weather Forecasts: ${_forecasts.length}, '
-          'Upcoming Events: ${_upcomingEvents.length}',
+        // Add debugging for sponsored articles
+        log(
+          'Loaded ${_sponsoredArticles.length} sponsored articles for display',
         );
+        if (_sponsoredArticles.isNotEmpty) {
+          log('First sponsored article: ${_sponsoredArticles.first.title}');
+        }
       }
     } catch (e) {
-      debugPrint('Error loading dashboard data: $e');
+      log('Error loading dashboard data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(
@@ -145,42 +213,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // Add this method to fetch sponsored articles
+  // Update this method to properly fetch and process sponsored articles
   Future<List<Article>> _fetchSponsoredArticles() async {
     try {
+      log('Fetching published sponsored articles...');
+
+      // 1. First check if any sponsored articles exist at all
+      final allArticles =
+          await FirebaseFirestore.instance
+              .collection('sponsored_articles')
+              .get();
+
+      log('Total sponsored articles in database: ${allArticles.docs.length}');
+
+      if (allArticles.docs.isEmpty) {
+        log('No sponsored articles found in the database');
+        return [];
+      }
+
+      // 2. Now fetch published ones with better error detection
       final snapshot =
           await FirebaseFirestore.instance
               .collection('sponsored_articles')
               .where('status', isEqualTo: 'published')
-              .where('publishedAt', isLessThan: DateTime.now())
-              .where('expiresAt', isGreaterThan: DateTime.now())
-              .orderBy('publishedAt', descending: true)
-              .limit(10)
               .get();
 
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        return Article(
-          id: doc.id,
-          title: data['title'] ?? '',
-          excerpt:
-              data['content'] != null && data['content'].length > 150
-                  ? '${data['content'].substring(0, 150)}...'
-                  : data['content'] ??
-                      '', // Replace 'description' with 'excerpt'
-          imageUrl: data['headerImageUrl'],
-          publishDate: data['publishedAt']?.toDate() ?? DateTime.now(),
-          author: data['authorName'] ?? '',
-          url: data['ctaLink'] ?? '',
-          linkText: data['ctaText'] ?? 'Read More',
-          isSponsored: true,
-          source: data['companyName'] ?? 'Sponsored',
-          content: data['content'] ?? '',
+      log(
+        'Found ${snapshot.docs.length} published sponsored articles in Firestore',
+      );
+
+      if (snapshot.docs.isEmpty) {
+        log(
+          'No PUBLISHED sponsored articles found - check if any articles have status="published"',
         );
-      }).toList();
+        return [];
+      }
+
+      // 3. Process each document with better error handling
+      List<Article> articles = [];
+
+      for (var doc in snapshot.docs) {
+        try {
+          final data = doc.data();
+          log('Processing article ID: ${doc.id}, Title: ${data['title']}');
+
+          // Handle potential null publishedAt date
+          DateTime publishDate;
+          try {
+            publishDate = data['publishedAt']?.toDate() ?? DateTime.now();
+            log('Publish date: $publishDate');
+          } catch (dateError) {
+            log(
+              'Error parsing publishedAt date: $dateError, using current date instead',
+            );
+            publishDate = DateTime.now();
+          }
+
+          final article = Article(
+            id: doc.id,
+            title: data['title'] ?? 'Sponsored Article',
+            excerpt:
+                data['content'] != null &&
+                        data['content'].toString().length > 150
+                    ? '${data['content'].toString().substring(0, 150)}...'
+                    : data['content']?.toString() ?? '',
+            content: data['content']?.toString() ?? '',
+            imageUrl: data['headerImageUrl'] ?? '',
+            publishDate: publishDate,
+            author: data['authorName'] ?? 'Sponsor',
+            url: data['ctaLink'] ?? '',
+            linkText: data['ctaText'] ?? 'Learn More',
+            isSponsored: true,
+            source: data['companyName'] ?? 'Sponsored Content',
+          );
+
+          articles.add(article);
+        } catch (docError) {
+          log('Error processing document ${doc.id}: $docError');
+          // Continue to next document instead of failing entire list
+        }
+      }
+
+      log('Successfully processed ${articles.length} sponsored articles');
+      return articles;
     } catch (e) {
-      debugPrint('Error fetching sponsored articles: $e');
-      return [];
+      log('Error fetching sponsored articles: $e');
+      // Rethrow to provide better error reporting instead of returning empty list
+      throw Exception('Failed to load sponsored articles: $e');
     }
   }
 
@@ -204,7 +323,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withAlpha(25), // Replace withAlpha
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -254,45 +373,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Rest of your existing methods...
 
-  // Create a stateless widget for the Weather tab content
-  Widget _buildWeatherTab() {
-    return WeatherTab(weatherService: _weatherService, forecasts: _forecasts);
+  void _onDrawerOpen() async {
+    log("Drawer opened - refreshing user roles");
+
+    // Refresh both auth provider data and local role state
+    if (mounted) {
+      await Provider.of<app_auth.AuthProvider>(
+        context,
+        listen: false,
+      ).refreshUserData();
+
+      await _checkUserRoles();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Image.asset(
-          'assets/images/header.png',
-          height: 80,
-          fit: BoxFit.contain,
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        iconTheme: const IconThemeData(color: Color(0xFFd2982a)),
-        // Add search icon to app bar
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Color(0xFFd2982a)),
-            onPressed: () {
-              // Open search functionality
-              showSearch(
-                context: context,
-                delegate: news_search_delegate.NewsSearchDelegate(
-                  _localNews,
-                  _sportsNews,
-                  _columnsNews,
-                  _obituariesNews,
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      // Add drawer
-      drawer: _buildDrawer(context),
+      key: _scaffoldKey,
+      appBar: _buildAppBar(),
+      drawer: const AppDrawer(), // Replace the previous drawer code with this
       body:
           _isLoading
               ? const Center(
@@ -300,27 +400,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               )
               : PageView(
                 controller: _pageController,
-                physics:
-                    const NeverScrollableScrollPhysics(), // Disable swiping
+                physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (index) {
                   setState(() {
                     _selectedIndex = index;
                   });
                 },
                 children: [
-                  // Home/Dashboard tab
                   _buildDashboardContent(),
-
-                  // News tab
                   const HomeScreen(),
-
-                  // Weather tab - inline weather content
                   WeatherTab(
                     weatherService: _weatherService,
                     forecasts: _forecasts,
                   ),
-
-                  // Calendar tab
                   const CalendarScreen(),
                 ],
               ),
@@ -329,7 +421,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         elevation: 8.0,
         currentIndex: _selectedIndex,
         onTap: (index) {
-          // Update the selected index and change page
           setState(() {
             _selectedIndex = index;
             _pageController.jumpToPage(index);
@@ -827,331 +918,70 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Add this method for building the drawer
-  Widget _buildDrawer(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    String firstName = '';
+  // Update the _buildAppBar method
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: Image.asset(
+        'assets/images/header.png',
+        height: 40,
+        fit: BoxFit.contain,
+      ),
+      centerTitle: true,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: () => _showSearch(),
+        ),
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          onPressed: () {
+            // Navigate to notifications
+          },
+        ),
+      ],
+      backgroundColor: Colors.white,
+      elevation: 0,
+      iconTheme: const IconThemeData(color: Color(0xFF2d2c31)),
+    );
+  }
 
-    if (user != null && user.displayName != null) {
-      // Extract first name from display name
-      firstName = user.displayName!.split(' ')[0];
-    }
-
-    return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          // Header with logo and greeting
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
-            color: Colors.white,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Logo image instead of avatar
-                Image.asset(
-                  'assets/images/header.png',
-                  height: 60,
-                  fit: BoxFit.contain,
-                ),
-                const SizedBox(height: 16),
-
-                // Show greeting with first name if logged in
-                if (user != null)
-                  Text(
-                    'Hello $firstName',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                else
-                  Row(
-                    children: [
-                      const Text(
-                        'Welcome!',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.pushNamed(context, '/login');
-                        },
-                        child: const Text(
-                          'Sign In',
-                          style: TextStyle(
-                            color: Color(0xFFd2982a),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-
-          // Navigation items
-          ListTile(
-            leading: const Icon(Icons.home, color: Color(0xFFd2982a)),
-            title: const Text('Home'),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() => _selectedIndex = 0);
-              _pageController.jumpToPage(0);
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.newspaper, color: Color(0xFFd2982a)),
-            title: const Text('Latest News'),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() => _selectedIndex = 1);
-              _pageController.jumpToPage(1);
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(
-              Icons.sports_baseball,
-              color: Color(0xFFd2982a),
-            ),
-            title: const Text('Sports'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SportsScreen()),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.gavel, color: Color(0xFFd2982a)),
-            title: const Text('Politics'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const PoliticsScreen()),
-              );
-            },
-          ),
-
-          // Add Order Classifieds option here
-          ListTile(
-            leading: const Icon(Icons.shopping_cart, color: Color(0xFFd2982a)),
-            title: const Text('Order Classifieds'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) => const WebViewScreen(
-                        url: 'https://www.neusenews.com/order-classifieds',
-                        title: 'Order Classifieds',
-                      ),
-                ),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.cloud, color: Color(0xFFd2982a)),
-            title: const Text('Weather'),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() => _selectedIndex = 2);
-              _pageController.jumpToPage(2);
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.calendar_month, color: Color(0xFFd2982a)),
-            title: const Text('Community Calendar'),
-            onTap: () {
-              Navigator.pop(context);
-              setState(() => _selectedIndex = 3);
-              _pageController.jumpToPage(3);
-            },
-          ),
-
-          const Divider(),
-
-          // Submit section
-          const Padding(
-            padding: EdgeInsets.only(left: 16.0, top: 8.0),
-            child: Text(
-              'SUBMIT',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
-            ),
-          ),
-
-          ListTile(
-            leading: const Icon(
-              Icons.add_box_outlined,
-              color: Color(0xFFd2982a),
-            ),
-            title: const Text('News Tip'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SubmitNewsTipScreen(),
-                ),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.event, color: Color(0xFFd2982a)),
-            title: const Text('Sponsored Event'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SubmitSponsoredEventScreen(),
-                ),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.article, color: Color(0xFFd2982a)),
-            title: const Text('Sponsored Article'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SubmitSponsoredArticleScreen(),
-                ),
-              );
-            },
-          ),
-
-          const Divider(),
-
-          // Profile/settings section
-          if (user != null) ...[
-            ListTile(
-              leading: const Icon(Icons.person, color: Color(0xFFd2982a)),
-              title: const Text('Profile'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to profile screen
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfileScreen(),
-                  ),
-                );
-              },
-            ),
-
-            ListTile(
-              leading: const Icon(Icons.edit, color: Color(0xFFd2982a)),
-              title: const Text('Edit Profile'),
-              onTap: () {
-                Navigator.pop(context);
-
-                // Get current user data
-                String firstName = '';
-                String lastName = '';
-                final String email = user.email ?? '';
-
-                // Parse display name into first and last name
-                if (user.displayName != null) {
-                  final nameParts = user.displayName!.split(' ');
-                  firstName = nameParts.first;
-                  lastName = nameParts.length > 1 ? nameParts.last : '';
-                }
-
-                // Navigate to edit profile with current user data
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => EditProfileScreen(
-                          firstName: firstName,
-                          lastName: lastName,
-                          email: email,
-                          phone:
-                              '(252) 555-1234', // Default or placeholder data
-                          zipCode:
-                              '28577', // These would come from Firestore in a real app
-                          birthday: '',
-                          textAlerts: true,
-                          dailyDigest: true,
-                          sportsNewsletter: false,
-                          politicalNewsletter: true,
-                        ),
-                  ),
-                );
-              },
-            ),
-
-            ListTile(
-              leading: const Icon(Icons.settings, color: Color(0xFFd2982a)),
-              title: const Text('Settings'),
-              onTap: () {
-                Navigator.pop(context);
-                // Navigate to settings using direct push
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SettingsScreen(),
-                  ),
-                );
-              },
-            ),
-
-            ListTile(
-              leading: const Icon(Icons.logout, color: Color(0xFFd2982a)),
-              title: const Text('Logout'),
-              onTap: () async {
-                Navigator.pop(context);
-                await FirebaseAuth.instance.signOut();
-                setState(() {}); // Refresh drawer
-              },
-            ),
-          ],
-
-          // App info at the bottom
-          if (user == null) // Only show space if no user info is shown
-            const SizedBox(height: 16),
-
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              'Version 1.0.0',
-              style: TextStyle(color: Colors.grey[400], fontSize: 12),
-            ),
-          ),
-        ],
+  // Add this method to handle search functionality
+  void _showSearch() {
+    showSearch(
+      context: context,
+      delegate: news_search_delegate.NewsSearchDelegate(
+        _localNews, // Pass the required arguments
+        _localNews,
+        _sportsNews,
+        _columnsNews,
       ),
     );
+  }
+
+  Future<void> _downloadReport(String fileUrl) async {
+    if (fileUrl.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Report URL not available')),
+        );
+      }
+      return;
+    }
+
+    try {
+      final uri = Uri.parse(fileUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw 'Could not launch $fileUrl';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error downloading report: $e')));
+      }
+    }
   }
 }
 
@@ -1262,5 +1092,27 @@ class WeatherTab extends StatelessWidget {
         break;
     }
     return Icon(iconData, color: const Color(0xFFd2982a), size: 30);
+  }
+}
+
+// Add URL launcher helper method
+Future<void> _launchURL(BuildContext context, String url) async {
+  final uri = Uri.parse(url);
+  if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Could not open $url')));
+  }
+}
+
+class PlaceholderScreen extends StatelessWidget {
+  const PlaceholderScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Placeholder Screen')),
+      body: const Center(child: Text('This is a placeholder screen.')),
+    );
   }
 }
