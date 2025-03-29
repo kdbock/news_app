@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:news_app/models/article.dart';
-import 'package:news_app/widgets/webview_screen.dart';
+import 'package:neusenews/models/article.dart';
+import 'package:neusenews/widgets/webview_screen.dart';
 
 class NewsCardMini extends StatelessWidget {
   final Article article;

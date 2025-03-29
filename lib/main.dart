@@ -1,31 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:news_app/screens/splash_screen.dart';
-import 'package:news_app/screens/login_screen.dart';
-import 'package:news_app/screens/home_screen.dart';
-import 'package:news_app/screens/dashboard_screen.dart';
-import 'package:news_app/screens/article_detail_screen.dart';
-import 'package:news_app/screens/weather_screen.dart';
+import 'firebase_options.dart'; // This will be created by flutterfire configure
+import 'package:neusenews/screens/splash_screen.dart';
+import 'package:neusenews/screens/login_screen.dart';
+import 'package:neusenews/screens/home_screen.dart';
+import 'package:neusenews/screens/dashboard_screen.dart';
+import 'package:neusenews/screens/article_detail_screen.dart';
+import 'package:neusenews/screens/weather_screen.dart';
 // Add imports for all category screens
-import 'package:news_app/screens/local_news_screen.dart';
-import 'package:news_app/screens/politics_screen.dart';
-import 'package:news_app/screens/sports_screen.dart';
-import 'package:news_app/screens/obituaries_screen.dart';
-import 'package:news_app/screens/columns_screen.dart';
-import 'package:news_app/screens/public_notices_screen.dart';
-import 'package:news_app/screens/classifieds_screen.dart';
-import 'package:news_app/screens/profile_screen.dart';
-import 'package:news_app/screens/edit_profile_screen.dart';
+import 'package:neusenews/screens/local_news_screen.dart';
+import 'package:neusenews/screens/politics_screen.dart';
+import 'package:neusenews/screens/sports_screen.dart';
+import 'package:neusenews/screens/obituaries_screen.dart';
+import 'package:neusenews/screens/columns_screen.dart';
+import 'package:neusenews/screens/public_notices_screen.dart';
+import 'package:neusenews/screens/classifieds_screen.dart';
+import 'package:neusenews/screens/profile_screen.dart';
+import 'package:neusenews/screens/edit_profile_screen.dart';
 // Import Stripe package
 import 'package:provider/provider.dart';
-import 'package:news_app/providers/auth_provider.dart' as app_auth;
+import 'package:neusenews/providers/auth_provider.dart' as app_auth;
+// For logging
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Firebase without DefaultFirebaseOptions
-  await Firebase.initializeApp();
-
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(
     MultiProvider(
       providers: [
@@ -45,7 +44,7 @@ class MyApp extends StatelessWidget {
     return Consumer<app_auth.AuthProvider>(
       builder: (context, authProvider, _) {
         return MaterialApp(
-          title: 'News App',
+          title: 'Neuse News',
           theme: ThemeData(
             primaryColor: const Color(0xFFd2982a),
             colorScheme: ColorScheme.fromSeed(

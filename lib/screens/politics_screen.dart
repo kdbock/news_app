@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:news_app/screens/category_screen.dart';
+import 'package:neusenews/screens/category_screen.dart';
 
 class PoliticsScreen extends StatelessWidget {
   const PoliticsScreen({super.key});

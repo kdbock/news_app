@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:news_app/models/weather_data.dart';
-import 'package:news_app/models/weather_forecast.dart';
-import 'package:news_app/services/weather_service.dart';
+import 'package:neusenews/models/weather_data.dart';
+import 'package:neusenews/models/weather_forecast.dart';
+import 'package:neusenews/services/weather_service.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:async';

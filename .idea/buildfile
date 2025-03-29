@@ -1,0 +1,123 @@
+Flutter news_app
+
+Title: Neuse News
+Tagline: Hyper-local news with no pop-up ads, no AP news and no online subscription fees. No kidding!
+About: Neuse News is a comprehensive mobile application providing local news, sports, political, and business content from eastern North Carolina. The app serves as a digital hub for the community, featuring content from multiple trusted sources including NeuseNews.com, NeuseNewsSports.com, and NCPoliticalNews.com. 
+
+Design Guidelines
+* modern design, white background, gold header background, gold footer background, dark gray titles. 
+* Colors: Primary colors #d2982a (Gold) & #2d2c31 (Dark Gray)
+* Font & Sizes: Default system fonts and sizes (no custom fonts needed)
+* Theme gold button, white text modern corners 
+
+
+Firebase info:
+Project name
+news_app
+Project ID 
+neuse-news-df5fd
+Project number 
+236600949564
+Web API Key 
+AIzaSyCYHkIGUB7Et0OoTgChoORHdjz01QYGM5k
+App ID 
+1:236600949564:android:1290ec24f72f09c482fc39
+Storage bucket
+Neuse-news-df5fd.firebasestorage.app
+Package name
+com.wordnerd.neusenews
+Bundle ID
+com.wordnerd.neusenews
+Team ID
+H49R32NPY6
+
+Sign-in providers authorized by firebase
+Provider	Status	
+Email/Password	Enabled	
+Google	
+Enabled	
+ Apple	
+Enabled	
+Anonymous	
+Enabled	
+
+Openweathermap.org
+API key: 
+d7265370b126555980c6dc783ebe185e
+/Assets
+/Images
+loading_logo.png
+logo.png
+header.png
+google_signin.png
+apple_signin.png
+
+/Assets
+/Images
+/Weather
+Clear.jpeg
+Cloudy.jpeg
+Default.jpeg
+Fog.jpeg
+Rain.jpeg
+Snow.jpeg
+Thunder.jpeg
+
+Order
+main.dart Load with logo > Get started button > HYPER-LOCAL NEWS WITH NO POP-UP ADS, NO AP NEWS AND NO ONLINE SUBSCRIPTION FEES. NO KIDDING!
+
+Login logo  logo > HYPER-LOCAL NEWS WITH NO POP-UP ADS, NO AP NEWS AND NO ONLINE SUBSCRIPTION FEES. NO KIDDING!
+> login (bypass if previously logged in) with username/password using Firebase > incorporate registration option and forget password  successful login goes to home
+
+Home
+
+Header - hamburger menu, header.png, search icon to popup
+
+Drawer - logo.png - Menu (items open in home window)
+Local news - https://www.neusenews.com/index?format=rss
+NC Politics - https://www.ncpoliticalnews.com/news?format=rss
+Sports - https://www.neusenewssports.com/news-1?format=rss
+Columns -  https://www.neusenews.com/index/category/Columns?format=rss
+Matters of Record - https://www.neusenews.com/index/category/Matters+of+Record?format=rss
+Obituaries - https://www.neusenews.com/index/category/Obituaries?format=rss
+Public Notice - https://www.neusenews.com/index/category/Public+Notices?format=rss
+Classifieds -  https://www.neusenews.com/index/category/Classifieds?format=rss
+Order Classifieds - https://www.neusenews.com/order-classifieds
+__________
+Profile to profile_screen.dart
+Edit Profile to edit_profile_screen.dart
+Submit Press Release to submit_Press_release.dart
+Submit News Tip to submit_news_tip.dart
+Submit Sponsored Event to submit_sponsored_event.dart
+Submit Sponsored News to submit_sponsored_news.dart
+___________
+Logout to logout
+
+Bottom Navigation
+Home
+News
+Weather
+Calendar
+
+RSS Feed:
+Image - thumbnail	Title
+	Author, Date
+	Excerpt
+Share	Read More
+Image
+TItle
+Author
+Date
+Excerpt (2 lines)
+Read More
+Share
+
+RSS Feed example for build type
+RSS feed data example for proper formatting of text, image, and description
+<ins data-ad-slot="8857878744" data-ad-client="ca-pub-8186511832356025" class="adsbygoogle" data-ad-format="fluid" data-ad-layout="in-article"></ins>]]></content:encoded><media:content type="image/png" url="https://images.squarespace-cdn.com/content/v1/5af308849d5abbb875f94e0f/1738681996692-OB8ACB6ELU7IL11O43DS/Lenoir+County+man+arrested+for+meth+possession+after+SCARR+unit+stop.png?format=1500w" medium="image" isDefault="true" width="1500" height="844"><media:title type="plain">Lenoir County man arrested for meth possession after SCARR unit stop</media:title></media:content></item><item><title>KPD arrests suspect in attempted Walmart gun safe break-in</title><category>Local News</category><category>Crime</category><dc:creator>KPD Press Release</dc:creator><pubDate>Tue, 04 Feb 2025 18:00:00 +0000</pubDate><link>https://www.neusenews.com/index/2025/2/4/kpd-arrests-suspect-in-attempted-walmart-gun-safe-break-in</link><guid isPermaLink="false">5af308849d5abbb875f94e0f:5af308c30e2e72435caef952:67a2226ef195701409ac2d27</guid><description><![CDATA[Kinston Police and the Lenoir County Sheriff’s Office responded to a report of a suspect attempting to break into a gun safe at Walmart on Feb. 2. Officers quickly arrested Anthony Wooten, 24, who now faces multiple charges.]]></description><content:encoded><![CDATA[<ins data-ad-slot="8857878744" data-ad-client="ca-pub-8186511832356025" class="adsbygoogle" data-ad-format="fluid" data-ad-layout="in-article"></ins>
+
+
+
+
+
+

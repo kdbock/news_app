@@ -7,6 +7,17 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Import FileInputStream - add this import line
+import java.io.FileInputStream
+
+// At the top, before android block
+val keystoreProperties = org.jetbrains.kotlin.konan.properties.Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    // Fix the FileInputStream reference
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.wordnerd.neusenews"
     compileSdk = 35  // Updated to meet plugin requirements
@@ -23,19 +34,37 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    // Add signing configuration (Kotlin DSL syntax)
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+            storeFile = file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
+        }
+    }
+
     defaultConfig {
         applicationId = "com.wordnerd.neusenews"
-        minSdk = 23 // Minimum for Firebase
-        // Remove or comment out the minSdkVersion line as it's redundant with minSdk
-        // minSdkVersion(21) // This is the correct function syntax if you need it
-        targetSdk = 35  // Updated to match compileSdk
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        minSdkVersion(23)
+        targetSdkVersion(34)
+        versionCode = 3 // Increment this for every new release
+        versionName = "1.1.0" // Update this to the new version name
     }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            // Use release signing config instead of debug
+            signingConfig = signingConfigs.getByName("release")
+            // Fixed Kotlin DSL syntax for proguardFiles
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            
+            // Enable debug symbols
+            isMinifyEnabled = true
+            isShrinkResources = true
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
         }
     }
 }
@@ -47,6 +76,9 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
     // Add AppCompat dependency for Stripe
     implementation("androidx.appcompat:appcompat:1.6.1")
+    
+    // Add Stripe dependencies explicitly
+    implementation("com.stripe:stripe-android:20.29.1") 
 }
 
 flutter {

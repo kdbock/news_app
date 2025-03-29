@@ -1,38 +1,32 @@
-import 'dart:developer'; // For logging instead of print
+import 'dart:developer'; // For logging
 import 'package:flutter/material.dart';
-import 'package:news_app/services/news_service.dart';
-import 'package:news_app/models/article.dart';
-import 'package:news_app/widgets/news_card_mini.dart';
-import 'package:news_app/services/weather_service.dart';
-import 'package:news_app/models/weather_forecast.dart' as weather_forecast;
-import 'package:news_app/screens/weather_screen.dart';
-import 'package:news_app/screens/home_screen.dart';
-import 'package:news_app/widgets/news_search_delegate.dart'
+import 'package:neusenews/services/news_service.dart';
+import 'package:neusenews/models/article.dart';
+import 'package:neusenews/widgets/news_card_mini.dart';
+import 'package:neusenews/services/weather_service.dart';
+import 'package:neusenews/models/weather_forecast.dart' as weather_forecast;
+import 'package:neusenews/screens/weather_screen.dart';
+import 'package:neusenews/screens/home_screen.dart';
+import 'package:neusenews/widgets/news_search_delegate.dart'
     as news_search_delegate;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:news_app/screens/local_news_screen.dart';
-import 'package:news_app/screens/politics_screen.dart';
-import 'package:news_app/screens/sports_screen.dart';
-import 'package:news_app/screens/obituaries_screen.dart';
-import 'package:news_app/screens/columns_screen.dart';
-import 'package:news_app/screens/public_notices_screen.dart';
-import 'package:news_app/screens/classifieds_screen.dart';
-import 'package:news_app/screens/submit_news_tip.dart';
-import 'package:news_app/screens/submit_sponsored_event.dart';
-import 'package:news_app/screens/submit_sponsored_article.dart';
-import 'package:news_app/screens/profile_screen.dart';
-import 'package:news_app/screens/settings_screen.dart';
-import 'package:news_app/screens/calendar_screen.dart';
-import 'package:news_app/models/event.dart';
+import 'package:neusenews/screens/local_news_screen.dart';
+import 'package:neusenews/screens/politics_screen.dart';
+import 'package:neusenews/screens/sports_screen.dart';
+import 'package:neusenews/screens/obituaries_screen.dart';
+import 'package:neusenews/screens/columns_screen.dart';
+import 'package:neusenews/screens/public_notices_screen.dart';
+import 'package:neusenews/screens/classifieds_screen.dart';
+import 'package:neusenews/screens/calendar_screen.dart';
+import 'package:neusenews/models/event.dart';
 import 'package:intl/intl.dart';
-import 'package:news_app/services/event_service.dart';
-import 'package:news_app/widgets/webview_screen.dart';
-import 'package:news_app/screens/admin_review_screen.dart';
+import 'package:neusenews/services/event_service.dart';
+import 'package:neusenews/widgets/webview_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:news_app/providers/auth_provider.dart' as app_auth;
+import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 import 'package:url_launcher/url_launcher.dart'; // Import for launchUrl
-import 'package:news_app/widgets/app_drawer.dart'; // Add this import
+import 'package:neusenews/widgets/app_drawer.dart'; // Add this import
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -88,10 +82,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
 
         if (userDoc.exists) {
           final data = userDoc.data()!;
@@ -145,65 +140,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() => _isLoading = true);
 
     try {
-      List<dynamic> results = [];
+      log('Starting to load dashboard data...');
+      List<dynamic> results = await Future.wait([
+        _newsService.fetchLocalNews(),
+        _newsService.fetchSports(),
+        _newsService.fetchColumns(),
+        _newsService.fetchClassifieds(),
+        _newsService.fetchObituaries(),
+        _newsService.fetchPublicNotices(),
+        _newsService.fetchNewsByUrl(
+          'https://www.ncpoliticalnews.com/news?format=rss',
+        ),
+        _weatherService.getForecast(),
+        _eventService.getUpcomingEvents(),
+        _fetchSponsoredArticles(),
+      ]);
 
-      try {
-        // Load data in parallel for better performance
-        results = await Future.wait([
-          _newsService.fetchLocalNews(),
-          _newsService.fetchSports(),
-          _newsService.fetchColumns(),
-          _newsService.fetchClassifieds(),
-          _newsService.fetchObituaries(),
-          _newsService.fetchPublicNotices(),
-          _newsService.fetchNewsByUrl(
-            'https://www.ncpoliticalnews.com/news?format=rss',
-          ),
-          _weatherService.getForecast(),
-          _eventService.getUpcomingEvents(),
-          _fetchSponsoredArticles(), // This might throw an exception
-        ]);
-      } catch (e) {
-        log('Error in one of the data fetches: $e');
-        // Continue with the function, we'll handle missing data
-      }
+      log('Successfully fetched all data.');
 
       if (mounted) {
         setState(() {
-          // Safely cast the results, handling possible missing data
-          _localNews = results.isNotEmpty ? results[0] as List<Article> : [];
-          _sportsNews = results.length > 1 ? results[1] as List<Article> : [];
-          _columnsNews = results.length > 2 ? results[2] as List<Article> : [];
-          _classifiedsNews =
-              results.length > 3 ? results[3] as List<Article> : [];
-          _obituariesNews =
-              results.length > 4 ? results[4] as List<Article> : [];
-          _publicNoticesNews =
-              results.length > 5 ? results[5] as List<Article> : [];
-          _politicsNews = results.length > 6 ? results[6] as List<Article> : [];
-          _forecasts =
-              results.length > 7
-                  ? results[7] as List<weather_forecast.WeatherForecast>
-                  : [];
-          _upcomingEvents = results.length > 8 ? results[8] as List<Event> : [];
-
-          // Handle sponsored articles separately since it's most likely to fail
-          _sponsoredArticles =
-              results.length > 9 ? results[9] as List<Article> : [];
-
+          _localNews = results[0] as List<Article>;
+          _sportsNews = results[1] as List<Article>;
+          _columnsNews = results[2] as List<Article>;
+          _classifiedsNews = results[3] as List<Article>;
+          _obituariesNews = results[4] as List<Article>;
+          _publicNoticesNews = results[5] as List<Article>;
+          _politicsNews = results[6] as List<Article>;
+          _forecasts = results[7] as List<weather_forecast.WeatherForecast>;
+          _upcomingEvents = results[8] as List<Event>;
+          _sponsoredArticles = results[9] as List<Article>;
           _isLoading = false;
         });
-
-        // Add debugging for sponsored articles
-        log(
-          'Loaded ${_sponsoredArticles.length} sponsored articles for display',
-        );
-        if (_sponsoredArticles.isNotEmpty) {
-          log('First sponsored article: ${_sponsoredArticles.first.title}');
-        }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       log('Error loading dashboard data: $e');
+      log('Stack trace: $stackTrace');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(

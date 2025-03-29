@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:news_app/screens/submit_sponsored_event.dart';
-import 'package:news_app/models/event.dart';
-import 'package:news_app/services/event_service.dart';
+import 'package:neusenews/screens/submit_sponsored_event.dart';
+import 'package:neusenews/models/event.dart';
+import 'package:neusenews/services/event_service.dart';
 
 class CalendarScreen extends StatefulWidget {
   // Add parameter for selected date

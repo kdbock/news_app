@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:news_app/models/article.dart';
+import 'package:neusenews/models/article.dart';
 import 'package:intl/intl.dart';
-import 'package:news_app/widgets/webview_screen.dart';
+import 'package:neusenews/widgets/webview_screen.dart';
 import 'package:share_plus/share_plus.dart';
 
 class ArticleDetailScreen extends StatelessWidget {

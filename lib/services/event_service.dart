@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
-import 'package:news_app/models/event.dart';
+import 'package:neusenews/models/event.dart';
 
 class EventService {
   // Singleton pattern to ensure only one instance exists

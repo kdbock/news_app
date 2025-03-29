@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:news_app/models/article.dart';
+import 'package:neusenews/models/article.dart';
 
 class NewsCard extends StatelessWidget {
   final Article article;

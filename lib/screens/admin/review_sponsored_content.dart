@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:news_app/screens/admin/article_preview_screen.dart';
-import 'package:news_app/screens/admin/event_preview_screen.dart';
+import 'package:neusenews/screens/admin/article_preview_screen.dart';
+import 'package:neusenews/screens/admin/event_preview_screen.dart';
 
 class ReviewSponsoredContentScreen extends StatefulWidget {
   const ReviewSponsoredContentScreen({super.key});

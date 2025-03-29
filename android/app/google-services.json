@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "236600949564",
+    "firebase_url": "https://neuse-news-df5fd-default-rtdb.firebaseio.com",
     "project_id": "neuse-news-df5fd",
     "storage_bucket": "neuse-news-df5fd.firebasestorage.app"
   },
@@ -12,7 +13,12 @@
           "package_name": "com.wordnerd.neusenews"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "236600949564-5nsalftfmgc6u1r3am1lcsbpp14m71ct.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCYHkIGUB7Et0OoTgChoORHdjz01QYGM5k"
@@ -20,7 +26,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "236600949564-5nsalftfmgc6u1r3am1lcsbpp14m71ct.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "236600949564-6tosfale5i8c0sjgasorjndbsr0p1h5o.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.newApp"
+              }
+            }
+          ]
         }
       }
     }

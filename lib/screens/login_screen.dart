@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
-import 'package:news_app/services/auth_service.dart';
+import 'package:neusenews/services/auth_service.dart';
 import 'package:provider/provider.dart';
-// First, add proper import for app_auth
-import 'package:news_app/providers/auth_provider.dart' as app_auth;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 
-// Add initialTab parameter to constructor
 class AuthScreen extends StatefulWidget {
   final int initialTab;
-  
+
   const AuthScreen({super.key, this.initialTab = 0});
 
   @override
@@ -20,18 +19,14 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  // Define both service and direct instances
   final AuthService _authService = AuthService();
-  final FirebaseAuth _auth = FirebaseAuth.instance; // Add this
-  final GoogleSignIn _googleSignIn = GoogleSignIn(); // Add this
-  // Remove or comment out Apple Sign-In
-  // final OAuthCredential _appleCredential = AppleAuthProvider.credential('');
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Use separate form keys for login and register
   final _loginFormKey = GlobalKey<FormState>();
   final _registerFormKey = GlobalKey<FormState>();
 
-  // Form controllers
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
@@ -42,14 +37,12 @@ class _AuthScreenState extends State<AuthScreen>
   final TextEditingController _zipCodeController = TextEditingController();
   final TextEditingController _birthdayController = TextEditingController();
 
-  // Newsletter options
   bool _textAlerts = false;
   bool _dailyDigest = false;
   bool _sportsNewsletter = false;
   bool _politicalNewsletter = false;
   bool _privacyPolicyAccepted = false;
 
-  // State
   bool _isLoading = false;
   String _errorMessage = '';
   DateTime? _selectedDate;
@@ -61,7 +54,7 @@ class _AuthScreenState extends State<AuthScreen>
       length: 2,
       vsync: this,
       initialIndex: widget.initialTab,
-    ); // Login + Register tabs
+    );
   }
 
   @override
@@ -78,32 +71,104 @@ class _AuthScreenState extends State<AuthScreen>
     super.dispose();
   }
 
-  // --- Firebase Auth Methods ---
-  // Update login method to use authService
   Future<void> _login() async {
     if (!_loginFormKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
     try {
-      debugPrint("Attempting login with email: ${_emailController.text.trim()}");
       final user = await _authService.login(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
 
-      debugPrint("Login completed, user: $user");
-      if (mounted) {
-        // Try both navigation approaches to identify which works
-        debugPrint("Navigating to home screen");
+      if (user != null && mounted) {
         Navigator.pushReplacementNamed(context, '/home');
       }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _errorMessage = _getFirebaseError(e.code);
+      });
     } catch (e) {
-      debugPrint("Error during login: $e");
-      setState(() => _errorMessage = "Login failed: $e");
+      setState(() {
+        _errorMessage = 'An unexpected error occurred. Please try again.';
+      });
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<User?> login(String email, String password) async {
+    try {
+      UserCredential result = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      User? user = result.user;
+
+      if (user != null) {
+        await updateUserRolesAfterLogin(user);
+      }
+
+      return user;
+    } on FirebaseAuthException catch (e) {
+      print('Login error: ${e.message}');
+      rethrow;
+    }
+  }
+
+  Future<User?> register(String email, String password) async {
+    try {
+      UserCredential result = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      User? user = result.user;
+
+      if (user != null) {
+        await _firestore.collection('users').doc(user.uid).set({
+          'email': email,
+          'createdAt': FieldValue.serverTimestamp(),
+          'isAdmin': false,
+          'isContributor': false,
+          'isInvestor': false,
+          'isCustomer': true,
+          'userType': 'customer',
+        });
+      }
+
+      return user;
+    } on FirebaseAuthException catch (e) {
+      print('Registration error: ${e.message}');
+      rethrow;
+    }
+  }
+
+  Future<void> updateUserRolesAfterLogin(User user) async {
+    try {
+      final userDoc = _firestore.collection('users').doc(user.uid);
+      final userSnapshot = await userDoc.get();
+
+      if (!userSnapshot.exists) {
+        // If the user document doesn't exist, create a default one
+        await userDoc.set({
+          'email': user.email,
+          'createdAt': FieldValue.serverTimestamp(),
+          'isAdmin': false,
+          'isContributor': false,
+          'isInvestor': false,
+          'isCustomer': true,
+          'userType': 'customer',
+        });
+      } else {
+        // Optionally, update the last login timestamp
+        await userDoc.update({'lastLogin': FieldValue.serverTimestamp()});
+      }
+    } catch (e) {
+      debugPrint('Error updating user roles: $e');
+      throw Exception('Failed to update user roles');
     }
   }
 
@@ -117,22 +182,25 @@ class _AuthScreenState extends State<AuthScreen>
 
     setState(() => _isLoading = true);
     try {
-      // Use authService instead of direct Firebase calls
       final user = await _authService.register(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
 
-      // Save additional user data
       if (user != null) {
         await _saveUserData(user.uid);
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
       }
-
-      if (mounted) {
-        _tempNavigateToHome(); // Use direct navigation for now
-      }
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _errorMessage = _getFirebaseError(e.code);
+      });
     } catch (e) {
-      setState(() => _errorMessage = "Registration failed: $e");
+      setState(() {
+        _errorMessage = 'An unexpected error occurred. Please try again.';
+      });
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -141,7 +209,6 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Future<void> _saveUserData(String userId) async {
-    // Implement Firestore/Database save here
     debugPrint('Saving user data for $userId');
   }
 
@@ -184,19 +251,20 @@ class _AuthScreenState extends State<AuthScreen>
   String _getFirebaseError(String code) {
     switch (code) {
       case 'user-not-found':
-        return 'No account found with this email';
+        return 'No account found with this email.';
       case 'wrong-password':
-        return 'Incorrect password';
+        return 'Incorrect password.';
       case 'email-already-in-use':
-        return 'Email already registered';
+        return 'This email is already registered.';
+      case 'invalid-email':
+        return 'Invalid email address.';
       case 'weak-password':
-        return 'Password must be 6+ characters';
+        return 'Password must be at least 6 characters.';
       default:
-        return 'Authentication failed. Please try again.';
+        return 'An unexpected error occurred. Please try again.';
     }
   }
 
-  // --- UI Helpers ---
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
@@ -238,14 +306,8 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildLoginTab() {
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          20.0,
-          30.0,
-          20.0,
-          20.0,
-        ), // Added more top padding
+        padding: const EdgeInsets.fromLTRB(20.0, 30.0, 20.0, 20.0),
         child: Form(
-          // Use the login-specific form key
           key: _loginFormKey,
           child: Column(
             children: [
@@ -282,44 +344,47 @@ class _AuthScreenState extends State<AuthScreen>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () async {
-                          try {
-                            setState(() => _isLoading = true);
+                  onPressed:
+                      _isLoading
+                          ? null
+                          : () async {
+                            try {
+                              setState(() => _isLoading = true);
 
-                            await Provider.of<app_auth.AuthProvider>(
-                              context,
-                              listen: false,
-                            ).signInWithEmailAndPassword(
-                              _emailController.text,
-                              _passwordController.text,
-                            );
-
-                            // Add mounted check before using context
-                            if (mounted) {
-                              Navigator.pushReplacementNamed(
-                                  context, '/dashboard');
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              setState(() => _isLoading = false);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Login failed: $e')),
+                              await Provider.of<app_auth.AuthProvider>(
+                                context,
+                                listen: false,
+                              ).signInWithEmailAndPassword(
+                                _emailController.text,
+                                _passwordController.text,
                               );
+
+                              if (mounted) {
+                                Navigator.pushReplacementNamed(
+                                  context,
+                                  '/dashboard',
+                                );
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                setState(() => _isLoading = false);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Login failed: $e')),
+                                );
+                              }
                             }
-                          }
-                        },
+                          },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 15),
-                    backgroundColor: const Color(0xFFd2982a), // Gold
+                    backgroundColor: const Color(0xFFd2982a),
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'LOGIN',
-                          style: TextStyle(color: Colors.white),
-                        ),
+                  child:
+                      _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                            'LOGIN',
+                            style: TextStyle(color: Colors.white),
+                          ),
                 ),
               ),
               _buildSocialButtons(),
@@ -333,14 +398,8 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildRegisterTab() {
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          20.0,
-          30.0,
-          20.0,
-          20.0,
-        ), // Added more top padding
+        padding: const EdgeInsets.fromLTRB(20.0, 30.0, 20.0, 20.0),
         child: Form(
-          // Use the register-specific form key
           key: _registerFormKey,
           child: Column(
             children: [
@@ -609,14 +668,15 @@ class _AuthScreenState extends State<AuthScreen>
                   onPressed: _isLoading ? null : _register,
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 15),
-                    backgroundColor: const Color(0xFFd2982a), // Gold
+                    backgroundColor: const Color(0xFFd2982a),
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'REGISTER',
-                          style: TextStyle(color: Colors.white),
-                        ),
+                  child:
+                      _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                            'REGISTER',
+                            style: TextStyle(color: Colors.white),
+                          ),
                 ),
               ),
               _buildSocialButtons(),
@@ -633,62 +693,49 @@ class _AuthScreenState extends State<AuthScreen>
       appBar: AppBar(
         title: Column(
           children: [
-            // Add padding at the top to push logo down slightly
-            const SizedBox(height: 12), // Increased from 8
-            // Add the centered logo
+            const SizedBox(height: 12),
             Center(
               child: Image.asset(
                 'assets/images/header.png',
-                height: 85, // Adjust height as needed
+                height: 85,
                 fit: BoxFit.contain,
               ),
             ),
-            // Add more space between logo and tabs
-            const SizedBox(height: 16), // Increased from 8
+            const SizedBox(height: 16),
           ],
         ),
-        toolbarHeight: 120, // Increased from 100 to accommodate extra padding
-        backgroundColor: Colors.white, // Changed to white
-        automaticallyImplyLeading: false, // Remove back button
+        toolbarHeight: 120,
+        backgroundColor: Colors.white,
+        automaticallyImplyLeading: false,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48.0),
           child: Stack(
             children: [
-              // Base container (white background)
-              Container(
-                color: Colors.white,
-                height: 48.0,
-              ), // Changed from gold to white
-              // Custom tab bar with rounded corners
+              Container(color: Colors.white, height: 48.0),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8.0),
                 child: TabBar(
                   controller: _tabController,
                   labelColor: Colors.white,
-                  unselectedLabelColor:
-                      Colors.white60, // Dimmer text for unselected
+                  unselectedLabelColor: Colors.white60,
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold),
                   dividerColor: Colors.transparent,
-                  indicatorWeight: 0, // Remove default indicator
-                  indicatorSize: TabBarIndicatorSize.tab, // Full width tabs
-                  // Custom tab decoration
+                  indicatorWeight: 0,
+                  indicatorSize: TabBarIndicatorSize.tab,
                   indicator: BoxDecoration(
-                    color: const Color(0xFFd2982a), // Selected tab color
+                    color: const Color(0xFFd2982a),
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(12),
                       topRight: Radius.circular(12),
                     ),
                   ),
-                  // Gap between tabs
-                  labelPadding: const EdgeInsets.symmetric(
-                    horizontal: 6.0,
-                  ), // Increased gap
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 6.0),
                   tabs: [
                     _buildCustomTab("LOGIN", _tabController.index == 0),
                     _buildCustomTab("REGISTER", _tabController.index == 1),
                   ],
                   onTap: (index) {
-                    setState(() {}); // Refresh UI when tab changes
+                    setState(() {});
                   },
                 ),
               ),
@@ -706,10 +753,7 @@ class _AuthScreenState extends State<AuthScreen>
   Widget _buildCustomTab(String text, bool isSelected) {
     return Container(
       decoration: BoxDecoration(
-        color:
-            isSelected
-                ? const Color(0xFFd2982a) // Selected tab is gold
-                : const Color(0xFFb88116), // Unselected tab is darker gold
+        color: isSelected ? const Color(0xFFd2982a) : const Color(0xFFb88116),
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(12),
           topRight: Radius.circular(12),

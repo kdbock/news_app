@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:news_app/services/news_service.dart';
-import 'package:news_app/models/article.dart';
-import 'package:news_app/widgets/news_card.dart';
+import 'package:neusenews/services/news_service.dart';
+import 'package:neusenews/models/article.dart';
+import 'package:neusenews/widgets/news_card.dart';
 
 class CategoryScreen extends StatefulWidget {
   final String category;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:news_app/screens/edit_profile_screen.dart';
+import 'package:neusenews/screens/edit_profile_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:news_app/providers/auth_provider.dart' as app_auth;
+import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});

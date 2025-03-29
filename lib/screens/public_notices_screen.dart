@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:news_app/screens/category_screen.dart';
+import 'package:neusenews/screens/category_screen.dart';
 
 class PublicNoticesScreen extends StatelessWidget {
   const PublicNoticesScreen({super.key});

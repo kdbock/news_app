@@ -1,4 +1,7 @@
-platform :ios, '13.0'
+platform :ios, '14.0'
+
+# Set this to avoid App.framework issues
+ENV['SWIFT_VERSION'] = '5.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -27,23 +30,88 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 flutter_ios_podfile_setup
 
 target 'Runner' do
+  use_frameworks!
   use_modular_headers!
-  use_frameworks! :linkage => :static
-  
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  pod 'Firebase/Core', '11.8.0'
+  pod 'Firebase/Auth', '11.8.0'
+  pod 'Firebase/Firestore', '11.8.0'
+  pod 'Firebase/Messaging', '11.8.0'
+end
+
+# Helper method to remove problematic flags
+def remove_flag(flags, flag_to_remove)
+  return if flags.nil?
+  flags.reject { |flag| flag.to_s.include?(flag_to_remove) }
 end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     
+    # Handle BoringSSL-GRPC compiler flags
+    if target.name == 'BoringSSL-GRPC'
+      target.source_build_phase.files.each do |file|
+        if file.settings && file.settings['COMPILER_FLAGS']
+          flags = file.settings['COMPILER_FLAGS'].split
+          flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' || flag == '-G' }
+          file.settings['COMPILER_FLAGS'] = flags.join(' ')
+        end
+      end
+      
+      # Apply additional BoringSSL settings through build configurations
+      target.build_configurations.each do |config|
+        # Set optimization level explicitly for this target
+        config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
+        
+        # Disable specific compiler warnings for BoringSSL
+        config.build_settings['WARNING_CFLAGS'] = ['$(inherited)', '-Wno-shorten-64-to-32', '-Wno-comma', '-Wno-unreachable-code']
+        
+        # Remove -G flag specifically
+        if config.build_settings['OTHER_CFLAGS'].is_a?(Array)
+          config.build_settings['OTHER_CFLAGS'] = config.build_settings['OTHER_CFLAGS'].reject { |flag| flag.include?('-G') }
+        end
+        if config.build_settings['OTHER_CPLUSPLUSFLAGS'].is_a?(Array)
+          config.build_settings['OTHER_CPLUSPLUSFLAGS'] = config.build_settings['OTHER_CPLUSPLUSFLAGS'].reject { |flag| flag.include?('-G') }
+        end
+      end
+    end
+    
+    # Apply general settings to all targets
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      # Ensure Flutter.framework is correctly found
+      config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= [
+        "$(inherited)",
+        "$(PROJECT_DIR)/Flutter",
+        "$(PODS_ROOT)/**"
+      ]
+      
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
       config.build_settings['ENABLE_BITCODE'] = 'NO'
       config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
       config.build_settings['SWIFT_VERSION'] = '5.0'
+      config.build_settings['ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       
-      # Add the following for M1 Mac support if needed
+      # Only needed for simulator builds on M1 Macs
+      if config.name == 'Debug' && config.build_settings['ARCHS'] == '$(ARCHS_STANDARD)'
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+      end
+      
+      # Fix for the symlinks warnings
+      if target.name.start_with?("gRPC") || target.name.include?("BoringSSL")
+        config.build_settings['CLANG_WARN_DOCUMENTATION_COMMENTS'] = 'NO'
+      end
+      
+      # Fix for App.framework
+      config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
+      
+      if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 14.0
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      end
+      
+      # Important for M1/M2 Macs
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
     end
   end

@@ -1,16 +1,15 @@
 import 'dart:developer';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:news_app/screens/admin_review_screen.dart';
-import 'package:news_app/screens/submit_news_tip.dart';
-import 'package:news_app/screens/submit_sponsored_event.dart';
-import 'package:news_app/screens/submit_sponsored_article.dart';
-import 'package:news_app/screens/profile_screen.dart';
-import 'package:news_app/screens/settings_screen.dart';
-import 'package:news_app/screens/my_contributions_screen.dart';
-import 'package:news_app/screens/investor_dashboard_screen.dart';
+import 'package:neusenews/screens/admin_review_screen.dart';
+import 'package:neusenews/screens/submit_news_tip.dart';
+import 'package:neusenews/screens/submit_sponsored_event.dart';
+import 'package:neusenews/screens/submit_sponsored_article.dart';
+import 'package:neusenews/screens/profile_screen.dart';
+import 'package:neusenews/screens/settings_screen.dart';
+import 'package:neusenews/screens/my_contributions_screen.dart';
+import 'package:neusenews/screens/investor_dashboard_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:news_app/providers/auth_provider.dart' as app_auth;
+import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 import 'package:url_launcher/url_launcher.dart';
 
 class AppDrawer extends StatelessWidget {
