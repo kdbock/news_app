@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:neusenews/models/article.dart';
+import 'package:transparent_image/transparent_image.dart';
 
 class NewsCard extends StatelessWidget {
   final Article article;
@@ -28,18 +29,19 @@ class NewsCard extends StatelessWidget {
             children: [
               // Featured image
               Hero(
-                tag: 'article-${article.url}', // Changed from article.link
-                child: Image.network(
-                  article.imageUrl,
-                  height: 200,
-                  width: double.infinity,
+                tag: article.imageUrl,
+                child: FadeInImage.memoryNetwork(
+                  placeholder: kTransparentImage,
+                  image: article.imageUrl,
                   fit: BoxFit.cover,
-                  errorBuilder:
-                      (_, __, ___) => Image.asset(
-                        'assets/images/Default.jpeg',
-                        height: 200,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                  height: 150,
+                  width: double.infinity,
+                  fadeInDuration: const Duration(milliseconds: 300),
+                  imageErrorBuilder:
+                      (context, error, stackTrace) => Container(
+                        height: 150,
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.broken_image, size: 40),
                       ),
                 ),
               ),

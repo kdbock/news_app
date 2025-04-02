@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:neusenews/screens/category_screen.dart';
 
 class ObituariesScreen extends StatelessWidget {
-  const ObituariesScreen({super.key});
+  final bool showAppBar;
+
+  const ObituariesScreen({super.key, this.showAppBar = true});
 
   @override
   Widget build(BuildContext context) {
-    return const CategoryScreen(
+    return CategoryScreen(
       category: 'Obituaries',
-      url: 'https://www.neusenews.com/obituaries-1?format=rss',
+      url: 'https://www.neusenews.com/index/category/Obituaries?format=rss',
       categoryColor: Colors.purple,
+      showAppBar: showAppBar,
+      showBottomNav: true,
     );
   }
 }

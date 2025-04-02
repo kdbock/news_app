@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:neusenews/screens/category_screen.dart';
 
 class SportsScreen extends StatelessWidget {
-  const SportsScreen({super.key});
+  final bool showAppBar;
+
+  const SportsScreen({super.key, this.showAppBar = true});
 
   @override
   Widget build(BuildContext context) {
-    return const CategoryScreen(
+    return CategoryScreen(
       category: 'Sports',
       url: 'https://www.neusenewssports.com/news-1?format=rss',
-      categoryColor: Colors.green,
+      categoryColor: Colors.yellow,
+      showAppBar: showAppBar,
+      showBottomNav: true,
     );
   }
 }

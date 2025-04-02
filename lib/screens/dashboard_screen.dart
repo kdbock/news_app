@@ -6,7 +6,6 @@ import 'package:neusenews/widgets/news_card_mini.dart';
 import 'package:neusenews/services/weather_service.dart';
 import 'package:neusenews/models/weather_forecast.dart' as weather_forecast;
 import 'package:neusenews/screens/weather_screen.dart';
-import 'package:neusenews/screens/home_screen.dart';
 import 'package:neusenews/widgets/news_search_delegate.dart'
     as news_search_delegate;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -27,9 +26,14 @@ import 'package:provider/provider.dart';
 import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 import 'package:url_launcher/url_launcher.dart'; // Import for launchUrl
 import 'package:neusenews/widgets/app_drawer.dart'; // Add this import
+import 'package:neusenews/widgets/title_sponsor_banner.dart';
+import 'package:neusenews/widgets/in_feed_ad_banner.dart';
+import 'package:neusenews/models/ad.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final Function(String)? onCategorySelected;
+
+  const DashboardScreen({super.key, this.onCategorySelected});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -54,9 +58,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Add selected tab index
   int _selectedIndex = 0;
 
-  // PageController to manage the tab content
-  late PageController _pageController;
-
   // Add these scroll controllers for jump links
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _sectionKeys = {
@@ -72,44 +73,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     'publicNotices': GlobalKey(),
   };
 
-  // Add these variables to the _DashboardScreenState class:
-  bool _isAdmin = false;
-  bool _isContributor = false;
-  bool _isInvestor = false;
-
-  // Define the _checkUserRoles method
-  Future<void> _checkUserRoles() async {
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final userDoc =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(user.uid)
-                .get();
-
-        if (userDoc.exists) {
-          final data = userDoc.data()!;
-          setState(() {
-            _isAdmin = data['isAdmin'] ?? false;
-            _isContributor = data['isContributor'] ?? false;
-            _isInvestor = data['isInvestor'] ?? false;
-          });
-        }
-      }
-    } catch (e) {
-      log('Error checking user roles: $e');
-    }
-  }
-
   // Add this at the top of _DashboardScreenState class
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  // ignore: unused_field
+  final bool _isAdmin = false;
 
   @override
   void initState() {
     super.initState();
     _loadDashboardData();
-    _pageController = PageController(initialPage: 0);
 
     // Add this Firebase auth listener
     FirebaseAuth.instance.authStateChanges().listen((User? user) {
@@ -129,10 +102,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  // Define the _checkUserRoles method
+  Future<void> _checkUserRoles() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .get();
+
+        if (userDoc.exists) {
+          final data = userDoc.data()!;
+          setState(() {});
+        }
+      }
+    } catch (e) {
+      log('Error checking user roles: $e');
+    }
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
-    _pageController.dispose();
     super.dispose();
   }
 
@@ -155,6 +148,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _eventService.getUpcomingEvents(),
         _fetchSponsoredArticles(),
       ]);
+
+      // Add these debug lines:
+      final events = results[8] as List<Event>;
+      log('Loaded ${events.length} total events');
+      log('Sponsored events: ${events.where((e) => e.isSponsored).length}');
 
       log('Successfully fetched all data.');
 
@@ -295,7 +293,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(25), // Replace withAlpha
+            color: Colors.black.withAlpha(25),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -324,7 +322,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Add this method right after the _buildJumpLinks method
   Widget _buildJumpLink(String label, String section) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -343,51 +340,187 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Rest of your existing methods...
-
-  void _onDrawerOpen() async {
-    log("Drawer opened - refreshing user roles");
-
-    // Refresh both auth provider data and local role state
-    if (mounted) {
-      await Provider.of<app_auth.AuthProvider>(
-        context,
-        listen: false,
-      ).refreshUserData();
-
-      await _checkUserRoles();
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
       appBar: _buildAppBar(),
-      drawer: const AppDrawer(), // Replace the previous drawer code with this
-      body:
-          _isLoading
-              ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFd2982a)),
-              )
-              : PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (index) {
-                  setState(() {
-                    _selectedIndex = index;
-                  });
-                },
-                children: [
-                  _buildDashboardContent(),
-                  const HomeScreen(),
-                  WeatherTab(
-                    weatherService: _weatherService,
-                    forecasts: _forecasts,
-                  ),
-                  const CalendarScreen(),
-                ],
+      drawer: const AppDrawer(),
+      body: RefreshIndicator(
+        onRefresh: _loadDashboardData,
+        child: SingleChildScrollView(
+          controller: _scrollController, // Add this controller
+          padding: const EdgeInsets.only(bottom: 24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title sponsor at the top
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                child: TitleSponsorBanner(),
               ),
+              _isLoading
+                  ? const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFd2982a)),
+                  )
+                  : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Jump links at the top
+                      _buildJumpLinks(),
+
+                      // Latest News section
+                      Container(key: _sectionKeys['latestNews']),
+                      _buildSectionHeader(
+                        'Latest News',
+                        onSeeAllPressed: () {
+                          if (widget.onCategorySelected != null) {
+                            widget.onCategorySelected!('localnews');
+                          } else {
+                            _navigateToScreen(const LocalNewsScreen());
+                          }
+                        },
+                      ),
+                      _buildNewsSlider(_localNews),
+
+                      // Weather section
+                      Container(key: _sectionKeys['weather']),
+                      _buildSectionHeader(
+                        'This Week\'s Weather',
+                        onSeeAllPressed: () {
+                          if (widget.onCategorySelected != null) {
+                            widget.onCategorySelected!('weather');
+                          } else {
+                            _navigateToScreen(const WeatherScreen());
+                          }
+                        },
+                      ),
+                      _buildWeatherPreview(),
+
+                      // Sponsored Events section
+                      Container(key: _sectionKeys['sponsoredEvents']),
+                      _buildSectionHeader(
+                        'Sponsored Events',
+                        onSeeAllPressed: () {
+                          if (widget.onCategorySelected != null) {
+                            widget.onCategorySelected!('calendar');
+                          } else {
+                            _navigateToScreen(const CalendarScreen());
+                          }
+                        },
+                      ),
+                      _buildEventSlider(_upcomingEvents),
+
+                      // Sponsored Articles section
+                      Container(key: _sectionKeys['sponsoredArticles']),
+                      _buildSectionHeader(
+                        'Sponsored Articles',
+                        onSeeAllPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (context) => const WebViewScreen(
+                                    url: 'https://www.neusenews.com/sponsored',
+                                    title: 'Sponsored Content',
+                                  ),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildNewsSlider(_sponsoredArticles),
+
+                      // Sports News section
+                      Container(key: _sectionKeys['sports']),
+                      _buildSectionHeader(
+                        'Sports',
+                        onSeeAllPressed: () {
+                          if (widget.onCategorySelected != null) {
+                            widget.onCategorySelected!('sports');
+                          } else {
+                            _navigateToScreen(const SportsScreen());
+                          }
+                        },
+                      ),
+                      _buildNewsSlider(_sportsNews),
+
+                      // Politics News section
+                      Container(key: _sectionKeys['politics']),
+                      _buildSectionHeader(
+                        'Politics',
+                        onSeeAllPressed: () {
+                          if (widget.onCategorySelected != null) {
+                            widget.onCategorySelected!('politics');
+                          } else {
+                            _navigateToScreen(const PoliticsScreen());
+                          }
+                        },
+                      ),
+                      _buildNewsSlider(_politicsNews),
+
+                      // Columns News section
+                      Container(key: _sectionKeys['columns']),
+                      _buildSectionHeader(
+                        'Columns',
+                        onSeeAllPressed: () {
+                          if (widget.onCategorySelected != null) {
+                            widget.onCategorySelected!('columns');
+                          } else {
+                            _navigateToScreen(const ColumnsScreen());
+                          }
+                        },
+                      ),
+                      _buildNewsSlider(_columnsNews),
+
+                      // Classifieds News section
+                      Container(key: _sectionKeys['classifieds']),
+                      _buildSectionHeader(
+                        'Classifieds',
+                        onSeeAllPressed: () {
+                          if (widget.onCategorySelected != null) {
+                            widget.onCategorySelected!('classifieds');
+                          } else {
+                            _navigateToScreen(const ClassifiedsScreen());
+                          }
+                        },
+                      ),
+                      _buildNewsSlider(_classifiedsNews),
+
+                      // Obituaries News section
+                      Container(key: _sectionKeys['obituaries']),
+                      _buildSectionHeader(
+                        'Obituaries',
+                        onSeeAllPressed: () {
+                          if (widget.onCategorySelected != null) {
+                            widget.onCategorySelected!('obituaries');
+                          } else {
+                            _navigateToScreen(const ObituariesScreen());
+                          }
+                        },
+                      ),
+                      _buildNewsSlider(_obituariesNews),
+
+                      // Public Notices News section
+                      Container(key: _sectionKeys['publicNotices']),
+                      _buildSectionHeader(
+                        'Public Notices',
+                        onSeeAllPressed: () {
+                          if (widget.onCategorySelected != null) {
+                            widget.onCategorySelected!('publicnotices');
+                          } else {
+                            _navigateToScreen(const PublicNoticesScreen());
+                          }
+                        },
+                      ),
+                      _buildNewsSlider(_publicNoticesNews),
+
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+            ],
+          ),
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: Colors.white,
         elevation: 8.0,
@@ -395,8 +528,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
         onTap: (index) {
           setState(() {
             _selectedIndex = index;
-            _pageController.jumpToPage(index);
           });
+
+          // Navigate to appropriate screen based on selected tab
+          switch (index) {
+            case 0: // Home tab
+              // Already on home screen, just reset scroll
+              if (_scrollController.hasClients) {
+                _scrollController.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              }
+              break;
+            case 1: // News tab
+              if (widget.onCategorySelected != null) {
+                widget.onCategorySelected!('localnews');
+              } else {
+                _navigateToScreen(const LocalNewsScreen());
+              }
+              break;
+            case 2: // Weather tab
+              if (widget.onCategorySelected != null) {
+                widget.onCategorySelected!('weather');
+              } else {
+                _navigateToScreen(const WeatherScreen());
+              }
+              break;
+            case 3: // Calendar tab
+              if (widget.onCategorySelected != null) {
+                widget.onCategorySelected!('calendar');
+              } else {
+                _navigateToScreen(const CalendarScreen());
+              }
+              break;
+          }
         },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFFd2982a),
@@ -414,227 +581,84 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Method to build the dashboard content
-  Widget _buildDashboardContent() {
-    return RefreshIndicator(
-      onRefresh: _loadDashboardData,
-      child: SingleChildScrollView(
-        controller: _scrollController,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Add jump links at the top
-            _buildJumpLinks(),
-
-            // Latest News section
-            Container(key: _sectionKeys['latestNews']),
-            _buildSectionHeader(
-              'Latest News',
-              onSeeAllPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const LocalNewsScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildNewsSlider(_localNews),
-
-            // Weather section
-            Container(key: _sectionKeys['weather']),
-            _buildSectionHeader(
-              'This Week\'s Weather',
-              onSeeAllPressed: () {
-                setState(() {
-                  _selectedIndex = 2; // Switch to weather tab
-                  _pageController.jumpToPage(2);
-                });
-              },
-            ),
-            _buildWeatherPreview(),
-
-            // Sponsored Events section
-            Container(key: _sectionKeys['sponsoredEvents']),
-            _buildSectionHeader(
-              'Sponsored Events',
-              onSeeAllPressed: () {
-                setState(() {
-                  _selectedIndex = 3; // Switch to calendar tab
-                  _pageController.jumpToPage(3);
-                });
-              },
-            ),
-            _buildEventSlider(
-              _upcomingEvents.where((e) => e.isSponsored).toList(),
-            ),
-
-            // Sponsored Articles section - NEW
-            Container(key: _sectionKeys['sponsoredArticles']),
-            _buildSectionHeader(
-              'Sponsored Articles',
-              onSeeAllPressed: () {
-                // Navigate to a dedicated sponsored articles screen
-                // This would need to be implemented
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => const WebViewScreen(
-                          url: 'https://www.neusenews.com/sponsored',
-                          title: 'Sponsored Content',
-                        ),
-                  ),
-                );
-              },
-            ),
-            _buildNewsSlider(_sponsoredArticles),
-
-            // Sports News section
-            Container(key: _sectionKeys['sports']),
-            _buildSectionHeader(
-              'Sports',
-              onSeeAllPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const SportsScreen()),
-                );
-              },
-            ),
-            _buildNewsSlider(_sportsNews),
-
-            // Politics News section
-            Container(key: _sectionKeys['politics']),
-            _buildSectionHeader(
-              'NC Politics',
-              onSeeAllPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PoliticsScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildNewsSlider(_politicsNews),
-
-            // Columns News section
-            Container(key: _sectionKeys['columns']),
-            _buildSectionHeader(
-              'Columns',
-              onSeeAllPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ColumnsScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildNewsSlider(_columnsNews),
-
-            // Classifieds News section
-            Container(key: _sectionKeys['classifieds']),
-            _buildSectionHeader(
-              'Classifieds',
-              onSeeAllPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ClassifiedsScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildNewsSlider(_classifiedsNews),
-
-            // Obituaries News section
-            Container(key: _sectionKeys['obituaries']),
-            _buildSectionHeader(
-              'Obituaries',
-              onSeeAllPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ObituariesScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildNewsSlider(_obituariesNews),
-
-            // Public Notices News section
-            Container(key: _sectionKeys['publicNotices']),
-            _buildSectionHeader(
-              'Public Notices',
-              onSeeAllPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PublicNoticesScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildNewsSlider(_publicNoticesNews),
-
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
-    );
+  // Helper method for navigation
+  void _navigateToScreen(Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
   }
 
-  // Updated to take a list of articles as parameter for reusability
   Widget _buildNewsSlider(List<Article> articles) {
+    // Return early if no articles
+    if (articles.isEmpty) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: Text('No news available')),
+      );
+    }
+
+    // Create a combined list of articles and ads
+    final itemCount =
+        articles.length + (articles.length > 3 ? articles.length ~/ 4 : 0);
+
     return SizedBox(
-      height: 200, // Adjusted height for the slider
-      child:
-          articles.isEmpty
-              ? const Center(child: Text('No news available'))
-              : ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                itemCount: articles.length,
-                itemBuilder: (context, index) {
-                  final article = articles[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: Stack(
-                      children: [
-                        NewsCardMini(
-                          article: article,
-                          onTap: () => _openArticle(article),
+      height: 200,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        itemCount: itemCount,
+        itemBuilder: (context, index) {
+          // Show an ad every 4 items (after position 3, 7, 11, etc.)
+          if (index > 0 && index % 5 == 0 && index ~/ 5 < 3) {
+            // Limit to max 3 ads
+            return Container(
+              width: 140,
+              margin: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: const InFeedAdBanner(adType: AdType.inFeedDashboard),
+            );
+          }
+
+          // Adjust article index for ads
+          final articleIndex = index - (index ~/ 5);
+          if (articleIndex >= articles.length) return const SizedBox.shrink();
+
+          final article = articles[articleIndex];
+
+          return Container(
+            width: 140,
+            margin: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: Stack(
+              children: [
+                NewsCardMini(
+                  article: article,
+                  onTap: () => _openArticle(article),
+                ),
+                if (article.isSponsored)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFd2982a),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'SPONSORED',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
                         ),
-                        // Show sponsored badge if article is sponsored
-                        if (article.isSponsored)
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFd2982a),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'SPONSORED',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+                      ),
                     ),
-                  );
-                },
-              ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -741,7 +765,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.pushNamed(context, '/article', arguments: article);
   }
 
-  // Add this method to build the event slider
   Widget _buildEventSlider(List<Event> events) {
     return SizedBox(
       height: 160, // Adjusted height for the event slider
@@ -879,7 +902,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Add this method to show event details
   void _showEventDetails(Event event) {
     // Navigate to calendar and pass the event date to focus on
     Navigator.push(
@@ -890,7 +912,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Update the _buildAppBar method
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       title: Image.asset(
@@ -917,7 +938,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Add this method to handle search functionality
   void _showSearch() {
     showSearch(
       context: context,
@@ -930,161 +950,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _downloadReport(String fileUrl) async {
-    if (fileUrl.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Report URL not available')),
-        );
-      }
-      return;
-    }
-
-    try {
-      final uri = Uri.parse(fileUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        throw 'Could not launch $fileUrl';
-      }
-    } catch (e) {
-      if (mounted) {
+  Future<void> _launchURL(BuildContext context, String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error downloading report: $e')));
+        ).showSnackBar(SnackBar(content: Text('Could not open $url')));
       }
     }
-  }
-}
-
-// Create a stateless widget for the Weather tab content
-class WeatherTab extends StatelessWidget {
-  final WeatherService weatherService;
-  final List<weather_forecast.WeatherForecast> forecasts;
-
-  const WeatherTab({
-    super.key,
-    required this.weatherService,
-    required this.forecasts,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Weather Forecast',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child:
-                forecasts.isEmpty
-                    ? const Center(child: Text('Weather data unavailable'))
-                    : ListView.builder(
-                      itemCount: forecasts.length,
-                      itemBuilder: (context, index) {
-                        final forecast = forecasts[index];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: _buildWeatherIcon(forecast.condition),
-                            title: Text(
-                              forecast.day,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Text(forecast.condition),
-                            trailing: Text(
-                              '${forecast.temp.round()}°F',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-          ),
-          Align(
-            alignment: Alignment.center,
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const WeatherScreen(),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFd2982a),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('View Detailed Weather'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeatherIcon(String condition) {
-    IconData iconData;
-    switch (condition.toLowerCase()) {
-      case 'clear':
-        iconData = Icons.wb_sunny;
-        break;
-      case 'clouds':
-      case 'partly cloudy':
-        iconData = Icons.cloud;
-        break;
-      case 'rain':
-      case 'drizzle':
-        iconData = Icons.umbrella;
-        break;
-      case 'thunderstorm':
-        iconData = Icons.bolt;
-        break;
-      case 'snow':
-        iconData = Icons.ac_unit;
-        break;
-      case 'mist':
-      case 'fog':
-      case 'haze':
-        iconData = Icons.cloud_queue;
-        break;
-      default:
-        iconData = Icons.cloud;
-        break;
-    }
-    return Icon(iconData, color: const Color(0xFFd2982a), size: 30);
-  }
-}
-
-// Add URL launcher helper method
-Future<void> _launchURL(BuildContext context, String url) async {
-  final uri = Uri.parse(url);
-  if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Could not open $url')));
-  }
-}
-
-class PlaceholderScreen extends StatelessWidget {
-  const PlaceholderScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Placeholder Screen')),
-      body: const Center(child: Text('This is a placeholder screen.')),
-    );
   }
 }

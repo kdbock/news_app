@@ -41,7 +41,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyCYHkIGUB7Et0OoTgChoORHdjz01QYGM5k',
+    apiKey: 'AIzaSyBpp3rB0_hJLEd14oNLEZMjOIEI8dZK-q8',
     appId: '1:236600949564:android:1290ec24f72f09c482fc39',
     messagingSenderId: '236600949564',
     projectId: 'neuse-news-df5fd',
@@ -62,7 +62,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyByB7dt5n1W6W-3bZIXkndlt_w_34MrvQc',
-    appId: '1:236600949564:web:425641aa2ad6bcb582fc39',
+    appId: '1:236600949564:web:0599a1e31416837082fc39',
     messagingSenderId: '236600949564',
     projectId: 'neuse-news-df5fd',
     authDomain: 'neuse-news-df5fd.firebaseapp.com',
@@ -83,7 +83,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyByB7dt5n1W6W-3bZIXkndlt_w_34MrvQc',
-    appId: '1:236600949564:web:8f4dcee7714b70b382fc39',
+    appId: '1:236600949564:web:d87ddd799ca7e12b82fc39',
     messagingSenderId: '236600949564',
     projectId: 'neuse-news-df5fd',
     authDomain: 'neuse-news-df5fd.firebaseapp.com',

@@ -3,22 +3,21 @@ import 'dart:async';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:neusenews/screens/submit_sponsored_event.dart';
 import 'package:neusenews/models/event.dart';
 import 'package:neusenews/services/event_service.dart';
+import 'package:neusenews/screens/submit_sponsored_event.dart';
 
 class CalendarScreen extends StatefulWidget {
-  // Add parameter for selected date
+  final bool showAppBar;
   final DateTime? selectedDate;
 
-  const CalendarScreen({super.key, this.selectedDate});
+  const CalendarScreen({super.key, this.showAppBar = true, this.selectedDate});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
-  // Add EventService
   final EventService _eventService = EventService();
 
   CalendarFormat _calendarFormat = CalendarFormat.month;
@@ -31,15 +30,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize focused day with widget's selectedDate if provided
     _focusedDay = widget.selectedDate ?? DateTime.now();
     _selectedDay = _focusedDay;
 
-    // Load events with error handling during initialization
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadEvents().catchError((error) {
         debugPrint('Error during initial event loading: $error');
-        // Show a message to the user
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -60,7 +56,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
         'Fetching events for ${_focusedDay.year}-${_focusedDay.month}',
       );
 
-      // Use EventService to get events for the month
       final eventMap = await _eventService.getEventsForMonth(_focusedDay);
 
       if (mounted) {
@@ -103,44 +98,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  // Add this method to test your Firebase connection
-  void _testFirebaseConnection() async {
-    try {
-      debugPrint('Testing Firebase connection...');
-      // Try to get just one document to test connection
-      final testQuery = await FirebaseFirestore.instance
-          .collection('events')
-          .limit(1)
-          .get()
-          .timeout(const Duration(seconds: 5));
-
-      debugPrint(
-        'Firebase connection successful. Got ${testQuery.docs.length} documents.',
-      );
-
-      // Show connection status
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Firebase connection successful')),
-        );
-      }
-    } catch (e) {
-      debugPrint('Firebase connection test failed: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Firebase connection failed: $e')),
-        );
-      }
-    }
-  }
-
-  // Add a method to create a test event
   void _addTestEvent() async {
     try {
       await _eventService.addTestEvent();
-      // Clear EventService cache to ensure fresh data
       _eventService.clearCache();
-      // Reload events
       await _loadEvents();
 
       if (mounted) {
@@ -161,16 +122,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  // Add this method to your _CalendarScreenState class
-
   void _checkDatabaseStructure() async {
     try {
       debugPrint('Checking Firebase database structure...');
 
-      // List all collections in the root of the database
       final FirebaseFirestore db = FirebaseFirestore.instance;
 
-      // Try to access the events collection
       final eventsCollection = await db.collection('events').get();
 
       debugPrint(
@@ -180,7 +137,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
         'Events collection contains ${eventsCollection.size} documents.',
       );
 
-      // If there are documents, check the structure of the first one
       if (eventsCollection.docs.isNotEmpty) {
         final sampleDoc = eventsCollection.docs.first;
         final data = sampleDoc.data();
@@ -198,7 +154,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
           debugPrint('- $key: $valueString (Type: $valueType)');
         });
 
-        // Check for required fields
         final requiredFields = [
           'title',
           'description',
@@ -214,7 +169,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
         }
       }
 
-      // Show a summary in the UI
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -308,266 +262,288 @@ class _CalendarScreenState extends State<CalendarScreen> {
     );
   }
 
-  // Implement the rest of your calendar screen here...
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Community Calendar',
-          style: TextStyle(
-            color: Color(0xFF2d2c31),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        // Remove all the debugging icons
-        actions: [
-          // Keep only the refresh button with a more appropriate icon
-          IconButton(
-            icon: const Icon(Icons.event_available, color: Color(0xFFd2982a)),
-            onPressed: _loadEvents,
-            tooltip: 'Refresh Calendar',
-          ),
-        ],
-      ),
-      body:
-          _isLoading
-              ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFd2982a)),
-              )
-              : Column(
-                children: [
-                  // Keep the rest of your calendar UI unchanged
-                  TableCalendar(
-                    firstDay: DateTime.utc(2020, 1, 1),
-                    lastDay: DateTime.utc(2030, 12, 31),
-                    focusedDay: _focusedDay,
-                    calendarFormat: _calendarFormat,
-
-                    // Event loader
-                    eventLoader: (day) {
-                      final normalizedDate = DateTime(
-                        day.year,
-                        day.month,
-                        day.day,
-                      );
-                      return _events[normalizedDate] ?? [];
-                    },
-
-                    // Selection
-                    selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-                    onDaySelected: (selectedDay, focusedDay) {
-                      setState(() {
-                        _selectedDay = selectedDay;
-                        _focusedDay = focusedDay;
-                        _updateSelectedEvents();
-                      });
-                    },
-
-                    // Format and page changes
-                    onFormatChanged:
-                        (format) => setState(() => _calendarFormat = format),
-                    onPageChanged: (focusedDay) {
+    final calendarContent =
+        _isLoading
+            ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFd2982a)),
+            )
+            : Column(
+              children: [
+                TableCalendar(
+                  firstDay: DateTime.utc(2020, 1, 1),
+                  lastDay: DateTime.utc(2030, 12, 31),
+                  focusedDay: _focusedDay,
+                  calendarFormat: _calendarFormat,
+                  eventLoader: (day) {
+                    final normalizedDate = DateTime(
+                      day.year,
+                      day.month,
+                      day.day,
+                    );
+                    return _events[normalizedDate] ?? [];
+                  },
+                  selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                  onDaySelected: (selectedDay, focusedDay) {
+                    setState(() {
+                      _selectedDay = selectedDay;
                       _focusedDay = focusedDay;
-                      _loadEvents();
-                    },
-
-                    // Calendar styling to match app theme
-                    calendarStyle: const CalendarStyle(
-                      // Selected day
-                      selectedDecoration: BoxDecoration(
-                        color: Color(0xFFd2982a),
-                        shape: BoxShape.circle,
-                      ),
-                      selectedTextStyle: TextStyle(color: Colors.white),
-
-                      // Today
-                      todayDecoration: BoxDecoration(
-                        color: Color(0x55d2982a), // semi-transparent gold
-                        shape: BoxShape.circle,
-                      ),
-                      todayTextStyle: TextStyle(color: Color(0xFF2d2c31)),
-
-                      // Default day
-                      defaultTextStyle: TextStyle(color: Color(0xFF2d2c31)),
-
-                      // Weekend
-                      weekendTextStyle: TextStyle(color: Color(0xFF555555)),
-
-                      // Markers (dots for events)
-                      markersMaxCount: 3,
-                      markerDecoration: BoxDecoration(
-                        color: Color(0xFFd2982a),
-                        shape: BoxShape.circle,
-                      ),
-                      markerSize: 6.0,
-                      markerMargin: EdgeInsets.symmetric(horizontal: 0.5),
-
-                      // Outside days
-                      outsideTextStyle: TextStyle(color: Colors.grey),
-
-                      // Cell margins
-                      cellMargin: EdgeInsets.all(6.0),
+                      _updateSelectedEvents();
+                    });
+                  },
+                  onFormatChanged:
+                      (format) => setState(() => _calendarFormat = format),
+                  onPageChanged: (focusedDay) {
+                    _focusedDay = focusedDay;
+                    _loadEvents();
+                  },
+                  calendarStyle: const CalendarStyle(
+                    selectedDecoration: BoxDecoration(
+                      color: Color(0xFFd2982a),
+                      shape: BoxShape.circle,
                     ),
-
-                    // Header styling
-                    headerStyle: const HeaderStyle(
-                      titleCentered: true,
-                      formatButtonVisible: true,
-                      formatButtonDecoration: BoxDecoration(
-                        color: Color(0x22d2982a), // very light gold
-                        borderRadius: BorderRadius.all(Radius.circular(12.0)),
-                      ),
-                      formatButtonTextStyle: TextStyle(
-                        color: Color(0xFF2d2c31),
-                      ),
-                      titleTextStyle: TextStyle(
-                        color: Color(0xFF2d2c31),
-                        fontSize: 18.0,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      leftChevronIcon: Icon(
-                        Icons.chevron_left,
-                        color: Color(0xFFd2982a),
-                      ),
-                      rightChevronIcon: Icon(
-                        Icons.chevron_right,
-                        color: Color(0xFFd2982a),
-                      ),
+                    selectedTextStyle: TextStyle(color: Colors.white),
+                    todayDecoration: BoxDecoration(
+                      color: Color(0x55d2982a),
+                      shape: BoxShape.circle,
                     ),
-
-                    // Calendar builders for more customization if needed
-                    calendarBuilders: CalendarBuilders(
-                      // Makes the current day marker more prominent
-                      todayBuilder: (context, date, _) {
-                        return Container(
-                          margin: const EdgeInsets.all(4.0),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color:
-                                date.day == DateTime.now().day
-                                    ? const Color(0x33d2982a)
-                                    : Colors.transparent,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: const Color(0xFFd2982a),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Text(
-                            '${date.day}',
-                            style: const TextStyle(
-                              color: Color(0xFF2d2c31),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        );
-                      },
-                      // Customize the marker appearance
-                      markerBuilder: (context, date, events) {
-                        if (events.isEmpty) return const SizedBox.shrink();
-
-                        return Positioned(
-                          bottom: 1,
-                          child: Container(
-                            height: 6,
-                            width: events.length > 2 ? 18 : events.length * 6,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFd2982a),
-                              borderRadius: BorderRadius.circular(3.0),
-                            ),
-                          ),
-                        );
-                      },
+                    todayTextStyle: TextStyle(color: Color(0xFF2d2c31)),
+                    defaultTextStyle: TextStyle(color: Color(0xFF2d2c31)),
+                    weekendTextStyle: TextStyle(color: Color(0xFF555555)),
+                    markersMaxCount: 3,
+                    markerDecoration: BoxDecoration(
+                      color: Color(0xFFd2982a),
+                      shape: BoxShape.circle,
+                    ),
+                    markerSize: 6.0,
+                    markerMargin: EdgeInsets.symmetric(horizontal: 0.5),
+                    outsideTextStyle: TextStyle(color: Colors.grey),
+                    cellMargin: EdgeInsets.all(6.0),
+                  ),
+                  headerStyle: const HeaderStyle(
+                    titleCentered: true,
+                    formatButtonVisible: true,
+                    formatButtonDecoration: BoxDecoration(
+                      color: Color(0x22d2982a),
+                      borderRadius: BorderRadius.all(Radius.circular(12.0)),
+                    ),
+                    formatButtonTextStyle: TextStyle(color: Color(0xFF2d2c31)),
+                    titleTextStyle: TextStyle(
+                      color: Color(0xFF2d2c31),
+                      fontSize: 18.0,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    leftChevronIcon: Icon(
+                      Icons.chevron_left,
+                      color: Color(0xFFd2982a),
+                    ),
+                    rightChevronIcon: Icon(
+                      Icons.chevron_right,
+                      color: Color(0xFFd2982a),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child:
-                        _selectedEvents.isEmpty
-                            ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.event_busy,
-                                    size: 64,
+                  calendarBuilders: CalendarBuilders(
+                    todayBuilder: (context, date, _) {
+                      return Container(
+                        margin: const EdgeInsets.all(4.0),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color:
+                              date.day == DateTime.now().day
+                                  ? const Color(0x33d2982a)
+                                  : Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFd2982a),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Text(
+                          '${date.day}',
+                          style: const TextStyle(
+                            color: Color(0xFF2d2c31),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      );
+                    },
+                    markerBuilder: (context, date, events) {
+                      if (events.isEmpty) return const SizedBox.shrink();
+
+                      return Positioned(
+                        bottom: 1,
+                        child: Container(
+                          height: 6,
+                          width: events.length > 2 ? 18 : events.length * 6,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFd2982a),
+                            borderRadius: BorderRadius.circular(3.0),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child:
+                      _selectedEvents.isEmpty
+                          ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.event_busy,
+                                  size: 64,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No events scheduled for ${DateFormat('MMMM d, yyyy').format(_selectedDay!)}',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 16,
                                     color: Colors.grey,
                                   ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'No events scheduled for ${DateFormat('MMMM d, yyyy').format(_selectedDay!)}',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                            : ListView.builder(
-                              itemCount: _selectedEvents.length,
-                              itemBuilder: (context, index) {
-                                final event = _selectedEvents[index];
-                                return Card(
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 16.0,
-                                    vertical: 4.0,
-                                  ),
-                                  child: ListTile(
-                                    leading:
-                                        event.isSponsored
-                                            ? const Icon(
-                                              Icons.star,
-                                              color: Color(0xFFd2982a),
-                                            )
-                                            : const Icon(Icons.event),
-                                    title: Text(
-                                      event.title,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    subtitle: Text(
-                                      '${event.startTime}${event.endTime != null ? ' - ${event.endTime}' : ''}\n${event.location}',
-                                    ),
-                                    trailing:
-                                        event.isSponsored
-                                            ? const Text(
-                                              'SPONSORED',
-                                              style: TextStyle(
-                                                color: Color(0xFFd2982a),
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 10,
-                                              ),
-                                            )
-                                            : null,
-                                    isThreeLine: true,
-                                    onTap: () {
-                                      // Show event details
-                                      _showEventDetails(event);
-                                    },
-                                  ),
-                                );
-                              },
+                                ),
+                              ],
                             ),
+                          )
+                          : ListView.builder(
+                            itemCount: _selectedEvents.length,
+                            itemBuilder: (context, index) {
+                              final event = _selectedEvents[index];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 16.0,
+                                  vertical: 4.0,
+                                ),
+                                child: ListTile(
+                                  leading:
+                                      event.isSponsored
+                                          ? const Icon(
+                                            Icons.star,
+                                            color: Color(0xFFd2982a),
+                                          )
+                                          : const Icon(Icons.event),
+                                  title: Text(
+                                    event.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    '${event.startTime}${event.endTime != null ? ' - ${event.endTime}' : ''}\n${event.location}',
+                                  ),
+                                  trailing:
+                                      event.isSponsored
+                                          ? const Text(
+                                            'SPONSORED',
+                                            style: TextStyle(
+                                              color: Color(0xFFd2982a),
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 10,
+                                            ),
+                                          )
+                                          : null,
+                                  isThreeLine: true,
+                                  onTap: () {
+                                    _showEventDetails(event);
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                ),
+              ],
+            );
+
+    return WillPopScope(
+      onWillPop: () async {
+        print("Attempted to pop CalendarScreen");
+        return true;
+      },
+      child: Scaffold(
+        appBar:
+            widget.showAppBar
+                ? AppBar(
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
                   ),
-                ],
+                  title: const Text('Events Calendar'),
+                  backgroundColor: const Color(0xFFd2982a),
+                  actions: [
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder:
+                                (context) => const SubmitSponsoredEventScreen(),
+                          ),
+                        );
+                      },
+                      icon: const Icon(
+                        Icons.add_circle_outline,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        'Submit Event',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
+                )
+                : null,
+        drawer: null,
+        body: calendarContent,
+        bottomNavigationBar: Container(
+          color: Colors.red.withOpacity(0.2), // Debug color
+          child: BottomNavigationBar(
+            currentIndex: 3, // Calendar tab is active
+            onTap: (index) {
+              print("Tapped bottom nav item: $index");
+              switch (index) {
+                case 0: // Home
+                  Navigator.pushReplacementNamed(context, '/home');
+                  break;
+                case 1: // News
+                  Navigator.pushReplacementNamed(context, '/news');
+                  break;
+                case 2: // Weather
+                  Navigator.pushReplacementNamed(context, '/weather');
+                  break;
+                case 3: // Calendar
+                  // Already on calendar page
+                  break;
+              }
+            },
+            items: const [
+              BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.newspaper),
+                label: 'News',
               ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFFd2982a),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SubmitSponsoredEventScreen(),
-            ),
-          ).then((_) => _loadEvents());
-        },
-        child: const Icon(Icons.add),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.cloud),
+                label: 'Weather',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.calendar_month),
+                label: 'Calendar',
+              ),
+            ],
+            // Force show labels
+            showSelectedLabels: true,
+            showUnselectedLabels: true,
+            // Try fixed type
+            type: BottomNavigationBarType.fixed,
+          ),
+        ),
       ),
     );
   }

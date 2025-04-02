@@ -20,7 +20,7 @@ dependencies:
   shared_preferences: ^2.2.2       # Local storage
   cached_network_image: ^3.3.0     # Cache news images
   intl: ^0.19.0                    # Date formatting (updated version)
-  url_launcher: ^6.3.1            # Open URLs
+  url_launcher: ^6.1.11            # Open URLs
   cupertino_icons: ^1.0.8          # iOS-style icons
   share_plus: ^10.1.4  # Try a slightly older version if ^7.2.1 is causing issues
   webview_flutter: ^4.4.2          # Update to the latest version instead of 3.0.4
@@ -37,6 +37,8 @@ dependencies:
   # Add these dependencies
   cloud_functions: ^5.3.4
   fl_chart: ^0.70.2 # Use the latest version
+  transparent_image: ^2.0.1
+  sign_in_with_apple: ^6.1.4
 
 dev_dependencies:
   flutter_test:

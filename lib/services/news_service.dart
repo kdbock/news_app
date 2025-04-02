@@ -4,7 +4,11 @@ import '../models/article.dart';
 
 class NewsService {
   // Generic method to fetch news by any URL with improved error handling
-  Future<List<Article>> fetchNewsByUrl(String url) async {
+  Future<List<Article>> fetchNewsByUrl(
+    String url, {
+    int skip = 0,
+    int take = 10,
+  }) async {
     try {
       print('Fetching news from: $url');
 
@@ -16,10 +20,11 @@ class NewsService {
         print('Successfully loaded feed from: $url');
         try {
           final feed = RssFeed.parse(response.body);
-          final articles =
+          final allArticles =
               feed.items.map((item) => Article.fromRssItem(item)).toList();
-          print('Parsed ${articles.length} articles from $url');
-          return articles;
+          print('Parsed ${allArticles.length} articles from $url');
+          // Apply skip and take to limit results
+          return allArticles.skip(skip).take(take).toList();
         } catch (parseError) {
           print('Error parsing RSS feed from $url: $parseError');
           print(

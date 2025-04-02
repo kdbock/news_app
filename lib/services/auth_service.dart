@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AuthService {
   // Use non-nullable Firebase Auth
@@ -113,6 +114,84 @@ class AuthService {
       return user;
     } catch (e) {
       print("Google sign-in error: $e");
+      rethrow;
+    }
+  }
+
+  // Apple Sign-In
+  Future<User?> signInWithApple() async {
+    try {
+      // Check if Apple Sign In is available on this device
+      final isAvailable = await SignInWithApple.isAvailable();
+
+      if (!isAvailable) {
+        throw Exception('Apple Sign In is not available on this device');
+      }
+
+      // Request credential for the sign in
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      // Create OAuthCredential for Firebase
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      // Sign in with the credential
+      final userCredential = await _auth.signInWithCredential(oauthCredential);
+      final User? user = userCredential.user;
+
+      // Update user information in Firestore
+      if (user != null) {
+        final docSnapshot =
+            await _firestore.collection('users').doc(user.uid).get();
+
+        // Prepare the user data
+        final Map<String, dynamic> userData = {
+          'email': user.email,
+          'lastLogin': FieldValue.serverTimestamp(),
+        };
+
+        // Add first and last name if available from Apple
+        if (appleCredential.givenName != null) {
+          userData['firstName'] = appleCredential.givenName;
+        }
+
+        if (appleCredential.familyName != null) {
+          userData['lastName'] = appleCredential.familyName;
+        }
+
+        // Add display name if both names are available
+        if (appleCredential.givenName != null &&
+            appleCredential.familyName != null) {
+          userData['displayName'] =
+              '${appleCredential.givenName} ${appleCredential.familyName}';
+        }
+
+        if (!docSnapshot.exists) {
+          // Create new user document
+          userData['isAdmin'] = false;
+          userData['isContributor'] = false;
+          userData['isInvestor'] = false;
+          userData['isCustomer'] = true;
+          userData['userType'] = 'customer';
+          userData['createdAt'] = FieldValue.serverTimestamp();
+
+          await _firestore.collection('users').doc(user.uid).set(userData);
+        } else {
+          // Update existing document
+          await _firestore.collection('users').doc(user.uid).update(userData);
+        }
+      }
+
+      return user;
+    } catch (e) {
+      print("Error during Apple sign-in: $e");
       rethrow;
     }
   }

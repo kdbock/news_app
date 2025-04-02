@@ -4,10 +4,15 @@ import 'package:neusenews/models/weather_forecast.dart';
 import 'package:neusenews/services/weather_service.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:neusenews/widgets/ad_banner.dart';
+import 'package:neusenews/models/ad.dart';
+import 'package:neusenews/widgets/app_drawer.dart';
 import 'dart:async';
 
 class WeatherScreen extends StatefulWidget {
-  const WeatherScreen({super.key});
+  final bool showAppBar;
+
+  const WeatherScreen({super.key, this.showAppBar = true});
 
   @override
   State<WeatherScreen> createState() => _WeatherScreenState();
@@ -245,72 +250,11 @@ class _WeatherScreenState extends State<WeatherScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Weather',
-          style: TextStyle(
-            color: Color(0xFF2d2c31),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFFd2982a)),
-            onPressed: _refreshWeatherData,
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48.0),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16.0,
-              vertical: 8.0,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _zipController,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      hintText: 'Enter ZIP Code',
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 12.0,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24.0),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey[200],
-                      prefixIcon: const Icon(Icons.location_on),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.search),
-                        onPressed: _updateZipCode,
-                        color: const Color(0xFFd2982a),
-                      ),
-                    ),
-                    onSubmitted: (_) => _updateZipCode(),
-                    maxLength: 5,
-                    buildCounter:
-                        (
-                          context, {
-                          required currentLength,
-                          required isFocused,
-                          maxLength,
-                        }) => null,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      body:
+    final body = SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           _isLoading
               ? const Center(
                 child: CircularProgressIndicator(color: Color(0xFFd2982a)),
@@ -318,7 +262,26 @@ class _WeatherScreenState extends State<WeatherScreen>
               : _errorMessage != null
               ? _buildErrorView()
               : _buildWeatherContent(),
+
+          // Weather sponsor ad
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16.0),
+            child: AdBanner(adType: AdType.weather),
+          ),
+        ],
+      ),
     );
+
+    return widget.showAppBar
+        ? Scaffold(
+          appBar: AppBar(
+            title: const Text('Weather'),
+            backgroundColor: const Color(0xFFd2982a),
+          ),
+          drawer: const AppDrawer(),
+          body: body,
+        )
+        : body;
   }
 
   Widget _buildErrorView() {

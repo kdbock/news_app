@@ -1,6 +1,6 @@
 import 'dart:developer';
 import 'package:flutter/material.dart';
-import 'package:neusenews/screens/admin_review_screen.dart';
+import 'package:neusenews/screens/admin/admin_dashboard_screen.dart';
 import 'package:neusenews/screens/submit_news_tip.dart';
 import 'package:neusenews/screens/submit_sponsored_event.dart';
 import 'package:neusenews/screens/submit_sponsored_article.dart';
@@ -8,6 +8,7 @@ import 'package:neusenews/screens/profile_screen.dart';
 import 'package:neusenews/screens/settings_screen.dart';
 import 'package:neusenews/screens/my_contributions_screen.dart';
 import 'package:neusenews/screens/investor_dashboard_screen.dart';
+import 'package:neusenews/screens/advertising_options_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 import 'package:url_launcher/url_launcher.dart';
@@ -17,7 +18,6 @@ class AppDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Get auth provider with listen: true to rebuild when auth state changes
     final authProvider = Provider.of<app_auth.AuthProvider>(
       context,
       listen: true,
@@ -25,12 +25,10 @@ class AppDrawer extends StatelessWidget {
     final user = authProvider.user;
     final userData = authProvider.userData;
 
-    // Get user roles from provider
     final isAdmin = authProvider.isAdmin;
     final isContributor = authProvider.isContributor;
     final isInvestor = authProvider.isInvestor;
 
-    // Get first name
     String firstName = '';
     if (userData != null && userData['firstName'] != null) {
       firstName = userData['firstName'];
@@ -38,7 +36,6 @@ class AppDrawer extends StatelessWidget {
       firstName = user!.displayName!.split(' ').first;
     }
 
-    // Add debug prints
     log('Building drawer with user: ${user?.email}');
     log('User data: $userData');
     log('First name: $firstName');
@@ -50,23 +47,19 @@ class AppDrawer extends StatelessWidget {
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          // Header with logo and greeting - moved to top
+          // Header with logo and greeting
           Container(
-            // Increased top padding from 16 to 50 to add more space above the header
             padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
             color: Colors.white,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Logo image
                 Image.asset(
                   'assets/images/header.png',
                   height: 60,
                   fit: BoxFit.contain,
                 ),
                 const SizedBox(height: 16),
-
-                // Show greeting based on login status
                 Text(
                   user != null ? 'Hello, $firstName' : 'Welcome, Guest',
                   style: const TextStyle(
@@ -79,7 +72,7 @@ class AppDrawer extends StatelessWidget {
             ),
           ),
 
-          // Order Classifieds Link (highlighted) - moved below header
+          // Order Classifieds Link
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -164,7 +157,21 @@ class AppDrawer extends StatelessWidget {
             },
           ),
 
-          // For admin section:
+          ListTile(
+            leading: const Icon(Icons.ads_click, color: Color(0xFFd2982a)),
+            title: const Text('Advertise with Us'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AdvertisingOptionsScreen(),
+                ),
+              );
+            },
+          ),
+
+          // Admin section
           if (isAdmin) ...[
             const Divider(),
             const Padding(
@@ -179,24 +186,21 @@ class AppDrawer extends StatelessWidget {
               ),
             ),
             ListTile(
-              leading: const Icon(
-                Icons.admin_panel_settings,
-                color: Colors.red,
-              ),
-              title: const Text('Review Sponsored Content'),
+              leading: const Icon(Icons.dashboard, color: Colors.red),
+              title: const Text('Admin Dashboard'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const AdminReviewScreen(),
+                    builder: (context) => const AdminDashboardScreen(),
                   ),
                 );
               },
             ),
           ],
 
-          // For contributor section:
+          // Contributor section
           if (isContributor) ...[
             const Divider(),
             const Padding(
@@ -225,7 +229,7 @@ class AppDrawer extends StatelessWidget {
             ),
           ],
 
-          // For investor section:
+          // Investor section
           if (isInvestor) ...[
             const Divider(),
             const Padding(
@@ -254,7 +258,7 @@ class AppDrawer extends StatelessWidget {
             ),
           ],
 
-          // For authenticated users:
+          // Authenticated user options
           if (user != null) ...[
             const Divider(),
             ListTile(

@@ -40,6 +40,9 @@ android/key.properties
 # Firebase
 google-services.json
 GoogleService-Info.plist
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
 
 # Xcode
 DerivedData/

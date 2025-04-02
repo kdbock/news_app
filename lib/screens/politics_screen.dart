@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:neusenews/screens/category_screen.dart';
 
 class PoliticsScreen extends StatelessWidget {
-  const PoliticsScreen({super.key});
+  final bool showAppBar;
+
+  const PoliticsScreen({super.key, this.showAppBar = true});
 
   @override
   Widget build(BuildContext context) {
-    return const CategoryScreen(
-      category: 'NC Politics',
+    return CategoryScreen(
+      category: 'Politics',
       url: 'https://www.ncpoliticalnews.com/news?format=rss',
       categoryColor: Colors.red,
+      showAppBar: showAppBar,
+      showBottomNav: true,
     );
   }
 }

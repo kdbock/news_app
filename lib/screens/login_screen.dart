@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intl/intl.dart';
 import 'package:neusenews/services/auth_service.dart';
-import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:neusenews/providers/auth_provider.dart' as app_auth;
+import 'dart:io' show Platform;
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AuthScreen extends StatefulWidget {
   final int initialTab;
@@ -13,7 +12,7 @@ class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key, this.initialTab = 0});
 
   @override
-  State<AuthScreen> createState() => _AuthScreenState();
+  _AuthScreenState createState() => _AuthScreenState();
 }
 
 class _AuthScreenState extends State<AuthScreen>
@@ -21,7 +20,6 @@ class _AuthScreenState extends State<AuthScreen>
   late TabController _tabController;
   final AuthService _authService = AuthService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   final _loginFormKey = GlobalKey<FormState>();
@@ -72,23 +70,30 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Future<void> _login() async {
-    if (!_loginFormKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
+
     try {
+      print("Attempting login with: ${_emailController.text.trim()}");
+
+      // Use your AuthService instead of the Provider
+      // This avoids the Provider context issues
       final user = await _authService.login(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
 
+      print("Login result: ${user != null ? 'Success' : 'Failed'}");
+
       if (user != null && mounted) {
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushReplacementNamed(context, '/dashboard');
       }
     } on FirebaseAuthException catch (e) {
+      print("Firebase Auth Exception: ${e.code} - ${e.message}");
       setState(() {
         _errorMessage = _getFirebaseError(e.code);
       });
     } catch (e) {
+      print("Generic error: $e");
       setState(() {
         _errorMessage = 'An unexpected error occurred. Please try again.';
       });
@@ -96,25 +101,6 @@ class _AuthScreenState extends State<AuthScreen>
       if (mounted) {
         setState(() => _isLoading = false);
       }
-    }
-  }
-
-  Future<User?> login(String email, String password) async {
-    try {
-      UserCredential result = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      User? user = result.user;
-
-      if (user != null) {
-        await updateUserRolesAfterLogin(user);
-      }
-
-      return user;
-    } on FirebaseAuthException catch (e) {
-      print('Login error: ${e.message}');
-      rethrow;
     }
   }
 
@@ -213,14 +199,78 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
     try {
+      print("Attempting Google sign-in");
       final user = await _authService.signInWithGoogle();
+      print("Google sign-in result: ${user != null ? 'Success' : 'Failed'}");
 
       if (user != null && mounted) {
         Navigator.pushReplacementNamed(context, '/dashboard');
+      } else {
+        setState(
+          () => _errorMessage = "Google sign-in failed: No user returned",
+        );
       }
     } catch (e) {
+      print("Google sign-in error: $e");
       setState(() => _errorMessage = "Google sign-in failed: $e");
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() => _isLoading = true);
+    try {
+      print("Attempting Apple sign-in");
+      final isAvailable = await SignInWithApple.isAvailable();
+      if (!isAvailable) {
+        throw Exception('Apple Sign In is not available on this device');
+      }
+
+      if (Platform.isAndroid) {
+        final appleCredential = await SignInWithApple.getAppleIDCredential(
+          scopes: [
+            AppleIDAuthorizationScopes.email,
+            AppleIDAuthorizationScopes.fullName,
+          ],
+          webAuthenticationOptions: WebAuthenticationOptions(
+            clientId:
+                '236600949564-5nsalftfmgc6u1r3am1lcsbpp14m71ct.apps.googleusercontent.com', // Use your Web Client ID
+            redirectUri: Uri.parse(
+              'https://neuse-news-df5fd.firebaseapp.com/__/auth/handler',
+            ), // Use your Redirect URI
+          ),
+        );
+      } else {
+        final appleCredential = await SignInWithApple.getAppleIDCredential(
+          scopes: [
+            AppleIDAuthorizationScopes.email,
+            AppleIDAuthorizationScopes.fullName,
+          ],
+        );
+      }
+
+      final user = await _authService.signInWithApple();
+      print("Apple sign-in result: ${user != null ? 'Success' : 'Failed'}");
+
+      if (user != null && mounted) {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      } else {
+        setState(
+          () => _errorMessage = "Apple sign-in failed: No user returned",
+        );
+      }
+    } catch (e) {
+      print("Apple sign-in error: $e");
+      setState(() => _errorMessage = "Apple sign-in failed: $e");
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -280,10 +330,6 @@ class _AuthScreenState extends State<AuthScreen>
     }
   }
 
-  void _tempNavigateToHome() {
-    Navigator.pushReplacementNamed(context, '/dashboard');
-  }
-
   Widget _buildSocialButtons() {
     return Column(
       children: [
@@ -293,9 +339,32 @@ class _AuthScreenState extends State<AuthScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            IconButton(
-              icon: Image.asset('assets/images/google_signin.png', height: 40),
+            ElevatedButton.icon(
+              icon: Image.asset('assets/images/google_signin.png', height: 24),
+              label: const Text('Sign in with Google'),
               onPressed: _signInWithGoogle,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black87,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.apple, color: Colors.white),
+              label: const Text('Sign in with Apple'),
+              onPressed: _signInWithApple,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
             ),
           ],
         ),
@@ -347,31 +416,9 @@ class _AuthScreenState extends State<AuthScreen>
                   onPressed:
                       _isLoading
                           ? null
-                          : () async {
-                            try {
-                              setState(() => _isLoading = true);
-
-                              await Provider.of<app_auth.AuthProvider>(
-                                context,
-                                listen: false,
-                              ).signInWithEmailAndPassword(
-                                _emailController.text,
-                                _passwordController.text,
-                              );
-
-                              if (mounted) {
-                                Navigator.pushReplacementNamed(
-                                  context,
-                                  '/dashboard',
-                                );
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                setState(() => _isLoading = false);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Login failed: $e')),
-                                );
-                              }
+                          : () {
+                            if (_loginFormKey.currentState!.validate()) {
+                              _login(); // Use your existing _login method instead of mixing approaches
                             }
                           },
                   style: ElevatedButton.styleFrom(
@@ -432,6 +479,30 @@ class _AuthScreenState extends State<AuthScreen>
                 decoration: const InputDecoration(labelText: 'Email*'),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) => value!.isEmpty ? 'Required' : null,
+              ),
+              const SizedBox(height: 15),
+              TextFormField(
+                controller: _passwordController,
+                decoration: const InputDecoration(labelText: 'Password*'),
+                obscureText: true,
+                validator: (value) => value!.isEmpty ? 'Required' : null,
+              ),
+              const SizedBox(height: 15),
+              TextFormField(
+                controller: _confirmPasswordController,
+                decoration: const InputDecoration(
+                  labelText: 'Confirm Password*',
+                ),
+                obscureText: true,
+                validator: (value) {
+                  if (value!.isEmpty) {
+                    return 'Required';
+                  }
+                  if (value != _passwordController.text) {
+                    return 'Passwords do not match';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 15),
               TextFormField(
