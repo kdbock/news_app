@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neusenews/models/ad.dart';
-import 'package:neusenews/screens/ad_checkout_screen.dart';
+import 'package:neusenews/features/ads/screens/ad_checkout_screen.dart';
 
 class AdCreationScreen extends StatefulWidget {
   final AdType? initialAdType;

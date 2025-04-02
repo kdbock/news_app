@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:neusenews/screens/admin/user_management_tab.dart';
-import 'package:neusenews/screens/admin/ad_management_tab.dart';
-import 'package:neusenews/screens/admin/analytics_tab.dart';
-import 'package:neusenews/screens/admin/content_review_tab.dart';
+import 'package:neusenews/features/admin/screens/user_management_tab.dart';
+import 'package:neusenews/features/admin/screens/ad_management_tab.dart';
+import 'package:neusenews/features/admin/screens/analytics_tab.dart';
+import 'package:neusenews/features/admin/screens/content_review_tab.dart';
 import 'package:neusenews/services/role_service.dart';
 
 class AdminDashboardScreen extends StatefulWidget {

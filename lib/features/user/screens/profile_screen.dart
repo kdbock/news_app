@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:neusenews/screens/edit_profile_screen.dart';
+import 'package:neusenews/features/user/screens/edit_profile_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 

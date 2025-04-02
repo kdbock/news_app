@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:neusenews/models/ad.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 class AdService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -89,37 +90,45 @@ class AdService {
 
   // Record an impression
   Future<void> recordImpression(String adId) async {
-    await _firestore.collection('ads').doc(adId).update({
-      'impressions': FieldValue.increment(1),
-    });
+    try {
+      await _firestore.collection('ads').doc(adId).update({
+        'impressions': FieldValue.increment(1),
+      });
 
-    // Also update CTR
-    DocumentSnapshot doc = await _firestore.collection('ads').doc(adId).get();
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    int impressions = data['impressions'] ?? 0;
-    int clicks = data['clicks'] ?? 0;
+      // Also update CTR
+      DocumentSnapshot doc = await _firestore.collection('ads').doc(adId).get();
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      int impressions = data['impressions'] ?? 0;
+      int clicks = data['clicks'] ?? 0;
 
-    if (impressions > 0) {
-      double ctr = clicks / impressions * 100;
-      await _firestore.collection('ads').doc(adId).update({'ctr': ctr});
+      if (impressions > 0) {
+        double ctr = clicks / impressions * 100;
+        await _firestore.collection('ads').doc(adId).update({'ctr': ctr});
+      }
+    } catch (e) {
+      debugPrint("Error recording impression: $e");
     }
   }
 
   // Record a click
   Future<void> recordClick(String adId) async {
-    await _firestore.collection('ads').doc(adId).update({
-      'clicks': FieldValue.increment(1),
-    });
+    try {
+      await _firestore.collection('ads').doc(adId).update({
+        'clicks': FieldValue.increment(1),
+      });
 
-    // Also update CTR
-    DocumentSnapshot doc = await _firestore.collection('ads').doc(adId).get();
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    int impressions = data['impressions'] ?? 0;
-    int clicks = data['clicks'] ?? 0;
+      // Also update CTR
+      DocumentSnapshot doc = await _firestore.collection('ads').doc(adId).get();
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      int impressions = data['impressions'] ?? 0;
+      int clicks = data['clicks'] ?? 0;
 
-    if (impressions > 0) {
-      double ctr = clicks / impressions * 100;
-      await _firestore.collection('ads').doc(adId).update({'ctr': ctr});
+      if (impressions > 0) {
+        double ctr = clicks / impressions * 100;
+        await _firestore.collection('ads').doc(adId).update({'ctr': ctr});
+      }
+    } catch (e) {
+      debugPrint("Error recording click: $e");
     }
   }
 

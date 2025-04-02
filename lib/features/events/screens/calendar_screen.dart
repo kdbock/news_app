@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:neusenews/models/event.dart';
 import 'package:neusenews/services/event_service.dart';
-import 'package:neusenews/screens/submit_sponsored_event.dart';
+import 'package:neusenews/features/events/screens/submit_sponsored_event.dart';
 
 class CalendarScreen extends StatefulWidget {
   final bool showAppBar;

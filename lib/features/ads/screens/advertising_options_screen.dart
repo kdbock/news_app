@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:neusenews/models/ad.dart';
-import 'package:neusenews/screens/ad_creation_screen.dart';
+import 'package:neusenews/features/ads/screens/ad_creation_screen.dart';
 
 class AdvertisingOptionsScreen extends StatelessWidget {
   const AdvertisingOptionsScreen({super.key});

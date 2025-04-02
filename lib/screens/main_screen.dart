@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:neusenews/screens/dashboard_screen.dart';
-import 'package:neusenews/screens/local_news_screen.dart';
-import 'package:neusenews/screens/weather_screen.dart';
-import 'package:neusenews/screens/calendar_screen.dart';
-import 'package:neusenews/screens/sports_screen.dart';
-import 'package:neusenews/screens/politics_screen.dart';
-import 'package:neusenews/screens/obituaries_screen.dart';
-import 'package:neusenews/screens/public_notices_screen.dart';
-import 'package:neusenews/screens/columns_screen.dart';
-import 'package:neusenews/screens/classifieds_screen.dart';
+import 'package:neusenews/features/news/screens/local_news_screen.dart';
+import 'package:neusenews/features/weather/screens/weather_screen.dart';
+import 'package:neusenews/features/events/screens/calendar_screen.dart';
+import 'package:neusenews/features/news/screens/sports_screen.dart';
+import 'package:neusenews/features/news/screens/politics_screen.dart';
+import 'package:neusenews/features/news/screens/obituaries_screen.dart';
+import 'package:neusenews/features/news/screens/public_notices_screen.dart';
+import 'package:neusenews/features/news/screens/columns_screen.dart';
+import 'package:neusenews/features/news/screens/classifieds_screen.dart';
 import 'package:neusenews/widgets/app_drawer.dart';
 
 class MainScreen extends StatefulWidget {
@@ -133,7 +133,11 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Neuse News'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Neuse News'),
+        centerTitle: true,
+        backgroundColor: const Color(0xFFd2982a),
+      ),
       drawer: const AppDrawer(),
       body:
           _selectedIndex == 1 ? _buildNewsContent() : _screens[_selectedIndex],
@@ -145,6 +149,10 @@ class _MainScreenState extends State<MainScreen> {
             _currentCategory = null; // Reset category when switching tabs
           });
         },
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: const Color(0xFFd2982a),
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white70,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: 'News'),

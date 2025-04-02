@@ -1,17 +1,11 @@
 import 'dart:developer';
 import 'package:flutter/material.dart';
-import 'package:neusenews/screens/admin/admin_dashboard_screen.dart';
-import 'package:neusenews/screens/submit_news_tip.dart';
-import 'package:neusenews/screens/submit_sponsored_event.dart';
-import 'package:neusenews/screens/submit_sponsored_article.dart';
-import 'package:neusenews/screens/profile_screen.dart';
-import 'package:neusenews/screens/settings_screen.dart';
-import 'package:neusenews/screens/my_contributions_screen.dart';
-import 'package:neusenews/screens/investor_dashboard_screen.dart';
-import 'package:neusenews/screens/advertising_options_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 import 'package:url_launcher/url_launcher.dart';
+
+// Updated imports for the new organizational structure
+// Settings screen remains in core screens
+import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
@@ -76,7 +70,9 @@ class AppDrawer extends StatelessWidget {
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFd2982a),
+              color: const Color(
+                0xFF2d2c31,
+              ), // Changed to dark gray for more professional look
               borderRadius: BorderRadius.circular(8),
             ),
             child: ListTile(
@@ -115,59 +111,41 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(
               Icons.tips_and_updates,
-              color: Color(0xFFd2982a),
+              color: Color(
+                0xFF2d2c31,
+              ), // Changed to dark gray for more professional look
             ),
             title: const Text('Submit News Tip'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SubmitNewsTipScreen(),
-                ),
-              );
+              Navigator.pushNamed(context, '/submit-news-tip');
             },
           ),
 
           ListTile(
-            leading: const Icon(Icons.event, color: Color(0xFFd2982a)),
+            leading: const Icon(Icons.event, color: Color(0xFF2d2c31)),
             title: const Text('Submit Sponsored Event'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SubmitSponsoredEventScreen(),
-                ),
-              );
+              Navigator.pushNamed(context, '/submit-sponsored-event');
             },
           ),
 
           ListTile(
-            leading: const Icon(Icons.newspaper, color: Color(0xFFd2982a)),
+            leading: const Icon(Icons.newspaper, color: Color(0xFF2d2c31)),
             title: const Text('Submit Sponsored Article'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SubmitSponsoredArticleScreen(),
-                ),
-              );
+              Navigator.pushNamed(context, '/submit-sponsored-article');
             },
           ),
 
           ListTile(
-            leading: const Icon(Icons.ads_click, color: Color(0xFFd2982a)),
+            leading: const Icon(Icons.ads_click, color: Color(0xFF2d2c31)),
             title: const Text('Advertise with Us'),
             onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const AdvertisingOptionsScreen(),
-                ),
-              );
+              Navigator.pushNamed(context, '/advertising-options');
             },
           ),
 
@@ -181,21 +159,17 @@ class AppDrawer extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Colors.red,
+                  color:
+                      Colors.grey, // Changed to grey for more professional look
                 ),
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.dashboard, color: Colors.red),
+              leading: const Icon(Icons.dashboard, color: Color(0xFF2d2c31)),
               title: const Text('Admin Dashboard'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const AdminDashboardScreen(),
-                  ),
-                );
+                Navigator.pushNamed(context, '/admin-dashboard');
               },
             ),
           ],
@@ -210,21 +184,17 @@ class AppDrawer extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Colors.blue,
+                  color:
+                      Colors.grey, // Changed to grey for more professional look
                 ),
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.edit, color: Colors.blue),
+              leading: const Icon(Icons.edit, color: Color(0xFF2d2c31)),
               title: const Text('My Contributions'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const MyContributionsScreen(),
-                  ),
-                );
+                Navigator.pushNamed(context, '/my-contributions');
               },
             ),
           ],
@@ -239,21 +209,17 @@ class AppDrawer extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Colors.green,
+                  color:
+                      Colors.grey, // Changed to grey for more professional look
                 ),
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.trending_up, color: Colors.green),
+              leading: const Icon(Icons.trending_up, color: Color(0xFF2d2c31)),
               title: const Text('Investor Dashboard'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const InvestorDashboardScreen(),
-                  ),
-                );
+                Navigator.pushNamed(context, '/investor-dashboard');
               },
             ),
           ],
@@ -262,35 +228,25 @@ class AppDrawer extends StatelessWidget {
           if (user != null) ...[
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.person, color: Color(0xFFd2982a)),
+              leading: const Icon(Icons.person, color: Color(0xFF2d2c31)),
               title: const Text('Profile'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ProfileScreen(),
-                  ),
-                );
+                Navigator.pushNamed(context, '/profile');
               },
             ),
 
             ListTile(
-              leading: const Icon(Icons.settings, color: Color(0xFFd2982a)),
+              leading: const Icon(Icons.settings, color: Color(0xFF2d2c31)),
               title: const Text('Settings'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SettingsScreen(),
-                  ),
-                );
+                Navigator.pushNamed(context, '/settings');
               },
             ),
 
             ListTile(
-              leading: const Icon(Icons.logout, color: Color(0xFFd2982a)),
+              leading: const Icon(Icons.logout, color: Color(0xFF2d2c31)),
               title: const Text('Logout'),
               onTap: () async {
                 Navigator.pop(context);
@@ -303,7 +259,7 @@ class AppDrawer extends StatelessWidget {
           ] else ...[
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.login, color: Color(0xFFd2982a)),
+              leading: const Icon(Icons.login, color: Color(0xFF2d2c31)),
               title: const Text('Sign In'),
               onTap: () {
                 Navigator.pop(context);
@@ -312,7 +268,7 @@ class AppDrawer extends StatelessWidget {
             ),
 
             ListTile(
-              leading: const Icon(Icons.person_add, color: Color(0xFFd2982a)),
+              leading: const Icon(Icons.person_add, color: Color(0xFF2d2c31)),
               title: const Text('Register'),
               onTap: () {
                 Navigator.pop(context);

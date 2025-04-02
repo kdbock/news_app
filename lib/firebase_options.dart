@@ -40,9 +40,9 @@ class DefaultFirebaseOptions {
     }
   }
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBpp3rB0_hJLEd14oNLEZMjOIEI8dZK-q8',
-    appId: '1:236600949564:android:1290ec24f72f09c482fc39',
+  static FirebaseOptions get android => FirebaseOptions(
+    apiKey: const String.fromEnvironment('FIREBASE_ANDROID_API_KEY'),
+    appId: const String.fromEnvironment('FIREBASE_ANDROID_APP_ID'),
     messagingSenderId: '236600949564',
     projectId: 'neuse-news-df5fd',
     databaseURL: 'https://neuse-news-df5fd-default-rtdb.firebaseio.com',

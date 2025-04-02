@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:neusenews/models/ad.dart';
 import 'package:neusenews/widgets/app_drawer.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:neusenews/screens/ad_creation_screen.dart';
+import 'package:neusenews/features/ads/screens/ad_creation_screen.dart';
 // Ensure this is the correct path to the CreateAdScreen class
 
 class AdvertiserDashboardScreen extends StatefulWidget {

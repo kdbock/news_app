@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
-import 'package:neusenews/screens/admin/article_preview_screen.dart';
-import 'package:neusenews/screens/admin/event_preview_screen.dart';
+import 'package:neusenews/features/admin/screens/article_preview_screen.dart';
+import 'package:neusenews/features/admin/screens/event_preview_screen.dart';
 
 class ContentReviewTab extends StatefulWidget {
   const ContentReviewTab({super.key});

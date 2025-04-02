@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:neusenews/widgets/ad_banner.dart';
-import 'package:neusenews/models/ad.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -38,14 +36,19 @@ class _SplashScreenState extends State<SplashScreen> {
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Add the title sponsor at the top
-          const Padding(
-            padding: EdgeInsets.only(
-              left: 16.0,
-              right: 16.0,
-              top: 40.0, // Add top padding to move it down
+          // Replace the AdBanner with a static placeholder during splash
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 40.0),
+            child: Container(
+              height: 60,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Center(
+                child: Text("Ad Space", style: TextStyle(color: Colors.grey)),
+              ),
             ),
-            child: AdBanner(adType: AdType.titleSponsor),
           ),
           // Your existing splash screen content
           Expanded(

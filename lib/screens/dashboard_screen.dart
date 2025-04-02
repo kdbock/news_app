@@ -5,30 +5,39 @@ import 'package:neusenews/models/article.dart';
 import 'package:neusenews/widgets/news_card_mini.dart';
 import 'package:neusenews/services/weather_service.dart';
 import 'package:neusenews/models/weather_forecast.dart' as weather_forecast;
-import 'package:neusenews/screens/weather_screen.dart';
 import 'package:neusenews/widgets/news_search_delegate.dart'
     as news_search_delegate;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:neusenews/screens/local_news_screen.dart';
-import 'package:neusenews/screens/politics_screen.dart';
-import 'package:neusenews/screens/sports_screen.dart';
-import 'package:neusenews/screens/obituaries_screen.dart';
-import 'package:neusenews/screens/columns_screen.dart';
-import 'package:neusenews/screens/public_notices_screen.dart';
-import 'package:neusenews/screens/classifieds_screen.dart';
-import 'package:neusenews/screens/calendar_screen.dart';
 import 'package:neusenews/models/event.dart';
 import 'package:intl/intl.dart';
 import 'package:neusenews/services/event_service.dart';
 import 'package:neusenews/widgets/webview_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:neusenews/providers/auth_provider.dart' as app_auth;
-import 'package:url_launcher/url_launcher.dart'; // Import for launchUrl
-import 'package:neusenews/widgets/app_drawer.dart'; // Add this import
+import 'package:url_launcher/url_launcher.dart';
+import 'package:neusenews/widgets/app_drawer.dart';
 import 'package:neusenews/widgets/title_sponsor_banner.dart';
 import 'package:neusenews/widgets/in_feed_ad_banner.dart';
 import 'package:neusenews/models/ad.dart';
+
+// Import screens with aliases to avoid ambiguous references
+import 'package:neusenews/features/weather/screens/weather_screen.dart'
+    as weather;
+import 'package:neusenews/features/news/screens/local_news_screen.dart'
+    as local_news;
+import 'package:neusenews/features/news/screens/politics_screen.dart'
+    as politics;
+import 'package:neusenews/features/news/screens/sports_screen.dart' as sports;
+import 'package:neusenews/features/news/screens/obituaries_screen.dart'
+    as obituaries;
+import 'package:neusenews/features/news/screens/columns_screen.dart' as columns;
+import 'package:neusenews/features/news/screens/public_notices_screen.dart'
+    as public_notices;
+import 'package:neusenews/features/news/screens/classifieds_screen.dart'
+    as classifieds;
+import 'package:neusenews/features/events/screens/calendar_screen.dart'
+    as calendar;
 
 class DashboardScreen extends StatefulWidget {
   final Function(String)? onCategorySelected;
@@ -114,7 +123,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 .get();
 
         if (userDoc.exists) {
-          final data = userDoc.data()!;
+          // The data variable is unused but we'll keep it for future use
+          // final data = userDoc.data()!;
           setState(() {});
         }
       }
@@ -377,7 +387,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (widget.onCategorySelected != null) {
                             widget.onCategorySelected!('localnews');
                           } else {
-                            _navigateToScreen(const LocalNewsScreen());
+                            _navigateToScreen(
+                              const local_news.LocalNewsScreen(),
+                            );
                           }
                         },
                       ),
@@ -391,7 +403,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (widget.onCategorySelected != null) {
                             widget.onCategorySelected!('weather');
                           } else {
-                            _navigateToScreen(const WeatherScreen());
+                            _navigateToScreen(const weather.WeatherScreen());
                           }
                         },
                       ),
@@ -405,7 +417,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (widget.onCategorySelected != null) {
                             widget.onCategorySelected!('calendar');
                           } else {
-                            _navigateToScreen(const CalendarScreen());
+                            _navigateToScreen(const calendar.CalendarScreen());
                           }
                         },
                       ),
@@ -438,7 +450,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (widget.onCategorySelected != null) {
                             widget.onCategorySelected!('sports');
                           } else {
-                            _navigateToScreen(const SportsScreen());
+                            _navigateToScreen(const sports.SportsScreen());
                           }
                         },
                       ),
@@ -452,7 +464,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (widget.onCategorySelected != null) {
                             widget.onCategorySelected!('politics');
                           } else {
-                            _navigateToScreen(const PoliticsScreen());
+                            _navigateToScreen(const politics.PoliticsScreen());
                           }
                         },
                       ),
@@ -466,7 +478,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (widget.onCategorySelected != null) {
                             widget.onCategorySelected!('columns');
                           } else {
-                            _navigateToScreen(const ColumnsScreen());
+                            _navigateToScreen(const columns.ColumnsScreen());
                           }
                         },
                       ),
@@ -480,7 +492,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (widget.onCategorySelected != null) {
                             widget.onCategorySelected!('classifieds');
                           } else {
-                            _navigateToScreen(const ClassifiedsScreen());
+                            _navigateToScreen(
+                              const classifieds.ClassifiedsScreen(),
+                            );
                           }
                         },
                       ),
@@ -494,7 +508,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (widget.onCategorySelected != null) {
                             widget.onCategorySelected!('obituaries');
                           } else {
-                            _navigateToScreen(const ObituariesScreen());
+                            _navigateToScreen(
+                              const obituaries.ObituariesScreen(),
+                            );
                           }
                         },
                       ),
@@ -508,7 +524,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           if (widget.onCategorySelected != null) {
                             widget.onCategorySelected!('publicnotices');
                           } else {
-                            _navigateToScreen(const PublicNoticesScreen());
+                            _navigateToScreen(
+                              const public_notices.PublicNoticesScreen(),
+                            );
                           }
                         },
                       ),
@@ -522,7 +540,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFd2982a),
         elevation: 8.0,
         currentIndex: _selectedIndex,
         onTap: (index) {
@@ -546,28 +564,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (widget.onCategorySelected != null) {
                 widget.onCategorySelected!('localnews');
               } else {
-                _navigateToScreen(const LocalNewsScreen());
+                _navigateToScreen(const local_news.LocalNewsScreen());
               }
               break;
             case 2: // Weather tab
               if (widget.onCategorySelected != null) {
                 widget.onCategorySelected!('weather');
               } else {
-                _navigateToScreen(const WeatherScreen());
+                _navigateToScreen(const weather.WeatherScreen());
               }
               break;
             case 3: // Calendar tab
               if (widget.onCategorySelected != null) {
                 widget.onCategorySelected!('calendar');
               } else {
-                _navigateToScreen(const CalendarScreen());
+                _navigateToScreen(const calendar.CalendarScreen());
               }
               break;
           }
         },
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFFd2982a),
-        unselectedItemColor: Colors.grey[600],
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.white70,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: 'News'),
@@ -907,7 +925,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CalendarScreen(selectedDate: event.eventDate),
+        builder:
+            (context) => calendar.CalendarScreen(selectedDate: event.eventDate),
       ),
     );
   }
@@ -948,16 +967,5 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _columnsNews,
       ),
     );
-  }
-
-  Future<void> _launchURL(BuildContext context, String url) async {
-    final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Could not open $url')));
-      }
-    }
   }
 }

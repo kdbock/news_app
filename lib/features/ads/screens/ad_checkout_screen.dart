@@ -4,7 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:intl/intl.dart';
 import 'package:neusenews/models/ad.dart';
 import 'package:neusenews/services/ad_service.dart';
-import 'package:neusenews/screens/ad_confirmation_screen.dart';
+import 'package:neusenews/features/ads/screens/ad_confirmation_screen.dart';
 import 'package:neusenews/widgets/payment_form.dart';
 
 class AdCheckoutScreen extends StatefulWidget {
