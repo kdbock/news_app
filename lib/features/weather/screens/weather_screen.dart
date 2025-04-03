@@ -6,7 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:neusenews/widgets/ad_banner.dart';
 import 'package:neusenews/models/ad.dart';
-import 'package:neusenews/widgets/app_drawer.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:neusenews/widgets/app_bottom_navigation.dart'; // Import the file where AppBottomNavigation is defined
 import 'dart:async';
 
 class WeatherScreen extends StatefulWidget {
@@ -34,15 +35,14 @@ class _WeatherScreenState extends State<WeatherScreen>
   bool _isLoading = true;
   bool _isRefreshing = false;
   String? _errorMessage;
+  bool _useMetric = false; // Default to imperial (Fahrenheit)
 
-  TabController? _tabController;
   final ScrollController _scrollController = ScrollController();
   Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     _loadSavedZip();
 
     // Auto refresh every 30 minutes
@@ -56,10 +56,21 @@ class _WeatherScreenState extends State<WeatherScreen>
   @override
   void dispose() {
     _zipController.dispose();
-    _tabController?.dispose();
     _scrollController.dispose();
     _autoRefreshTimer?.cancel();
+
+    // Cancel any ongoing network requests
+    _cancelActiveRequests();
+
     super.dispose();
+  }
+
+  // Add this method to your class
+  void _cancelActiveRequests() {
+    // If using http package directly
+    _weatherService.cancelRequests();
+
+    // If the service doesn't have a cancelRequests method, you can implement it
   }
 
   Future<void> _loadSavedZip() async {
@@ -173,6 +184,9 @@ class _WeatherScreenState extends State<WeatherScreen>
   }
 
   String _formatTemperature(double temp) {
+    if (_useMetric) {
+      return '${((temp - 32) * 5 / 9).round()}°C';
+    }
     return '${temp.round()}°F';
   }
 
@@ -263,25 +277,157 @@ class _WeatherScreenState extends State<WeatherScreen>
               ? _buildErrorView()
               : _buildWeatherContent(),
 
-          // Weather sponsor ad
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16.0),
-            child: AdBanner(adType: AdType.weather),
+          // Lazy-load the ad after weather data is ready
+          FutureBuilder<bool>(
+            future: Future.delayed(
+              const Duration(milliseconds: 500),
+              () => true,
+            ),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData || _isLoading || _errorMessage != null) {
+                return const SizedBox(
+                  height: 0,
+                ); // Don't show ad placeholder while loading
+              }
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(left: 16.0, bottom: 8.0),
+                      child: Text(
+                        'Sponsored',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    AdBanner(
+                      adType: AdType.weather,
+                      onLoaded: (_) {
+                        debugPrint('Weather ad loaded successfully');
+                      },
+                      onError: (error) {
+                        debugPrint('Weather ad failed to load: $error');
+                      },
+                      errorBuilder:
+                          (context, error) => Container(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                            ),
+                            padding: const EdgeInsets.all(12),
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Ad temporarily unavailable',
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                            ),
+                          ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
     );
 
-    return widget.showAppBar
-        ? Scaffold(
-          appBar: AppBar(
-            title: const Text('Weather'),
-            backgroundColor: const Color(0xFFd2982a),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Weather'),
+        backgroundColor: const Color(0xFFd2982a),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder:
+                    (context) => AlertDialog(
+                      title: const Text('Weather Settings'),
+                      content: StatefulBuilder(
+                        builder: (context, setState) {
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListTile(
+                                title: const Text('Temperature Unit'),
+                                trailing: ToggleButtons(
+                                  isSelected: [!_useMetric, _useMetric],
+                                  onPressed: (index) {
+                                    setState(() {
+                                      _useMetric = index == 1;
+                                    });
+                                    // Also update in parent state
+                                    this.setState(() {});
+                                  },
+                                  children: const [Text('°F'), Text('°C')],
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Close'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            _refreshWeatherData();
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFd2982a),
+                          ),
+                          child: const Text('Refresh Weather'),
+                        ),
+                      ],
+                    ),
+              );
+            },
           ),
-          drawer: const AppDrawer(),
-          body: body,
-        )
-        : body;
+        ],
+      ),
+      body: body,
+      bottomNavigationBar: AppBottomNavigation(
+        currentIndex: 2, // Weather tab
+        onTap: (index) {
+          if (index != 2) {
+            // Navigate back first to avoid stacking
+            Navigator.of(context).pop();
+
+            // Then handle navigation based on tab
+            switch (index) {
+              case 0: // Home
+                Navigator.of(context).pushReplacementNamed('/home');
+                break;
+              case 1: // News
+                Navigator.of(context).pushReplacementNamed('/news');
+                break;
+              case 3: // Events
+                Navigator.of(context).pushReplacementNamed('/calendar');
+                break;
+            }
+          }
+        },
+      ),
+    );
   }
 
   Widget _buildErrorView() {
@@ -343,40 +489,31 @@ class _WeatherScreenState extends State<WeatherScreen>
 
             const SizedBox(height: 16),
 
-            // Tab controller for hourly/daily forecasts
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withAlpha(
-                      51,
-                    ), // Replace withOpacity(0.2) with withAlpha(51) (0.2*255≈51)
-                    spreadRadius: 1,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '5-Day Forecast',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2d2c31),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 200,
+                    child:
+                        _dailyForecast.isNotEmpty
+                            ? _buildDailyForecast()
+                            : Center(child: Text('No forecast data available')),
                   ),
                 ],
-              ),
-              child: TabBar(
-                controller: _tabController,
-                labelColor: const Color(0xFFd2982a),
-                unselectedLabelColor: Colors.grey[600],
-                indicatorColor: const Color(0xFFd2982a),
-                indicatorWeight: 3,
-                tabs: const [
-                  Tab(text: 'Hourly Forecast'),
-                  Tab(text: '5-Day Forecast'),
-                ],
-              ),
-            ),
-
-            // Tab view content
-            SizedBox(
-              height: 200,
-              child: TabBarView(
-                controller: _tabController,
-                children: [_buildHourlyForecast(), _buildDailyForecast()],
               ),
             ),
 
@@ -404,6 +541,12 @@ class _WeatherScreenState extends State<WeatherScreen>
             ),
 
             const SizedBox(height: 16),
+
+            // Add weather ad banner
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              child: const AdBanner(adType: AdType.weather),
+            ),
           ],
         ),
       ),
@@ -423,6 +566,7 @@ class _WeatherScreenState extends State<WeatherScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Location name
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -430,69 +574,79 @@ class _WeatherScreenState extends State<WeatherScreen>
               const SizedBox(width: 4),
               Text(
                 _locationName ?? 'Location',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+                style: const TextStyle(color: Colors.white),
               ),
             ],
           ),
           const SizedBox(height: 16),
+
+          // Weather information
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Temperature and icon
               Expanded(
                 child: Column(
                   children: [
+                    CachedNetworkImage(
+                      imageUrl:
+                          'https://openweathermap.org/img/wn/${_currentWeather!.icon}@2x.png',
+                      width: 80,
+                      height: 80,
+                      placeholder:
+                          (context, url) => const SizedBox(
+                            width: 80,
+                            height: 80,
+                            child: Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                      errorWidget:
+                          (context, url, error) => const Icon(
+                            Icons.cloud_off,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
+                    ),
                     Text(
                       _formatTemperature(_currentWeather!.temperature),
                       style: const TextStyle(
-                        fontSize: 56,
+                        fontSize: 36,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
-                    ),
-                    Text(
-                      'Feels like ${_formatTemperature(_currentWeather!.feelsLike)}',
-                      style: const TextStyle(fontSize: 16, color: Colors.white),
                     ),
                   ],
                 ),
               ),
+
+              // Description and feels like
               Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Image.network(
-                      'https://openweathermap.org/img/wn/${_currentWeather!.icon}@2x.png',
-                      width: 80,
-                      height: 80,
-                      errorBuilder:
-                          (context, error, stackTrace) => const Icon(
-                            Icons.cloud,
-                            size: 80,
-                            color: Colors.white,
-                          ),
-                    ),
-                    Text(
-                      _currentWeather!.condition,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
                     Text(
                       _currentWeather!.description,
                       style: const TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Feels like: ${_formatTemperature(_currentWeather!.feelsLike)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
+
           const SizedBox(height: 16),
+
+          // Weather details row (humidity, wind, pressure)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
@@ -513,7 +667,6 @@ class _WeatherScreenState extends State<WeatherScreen>
               ),
             ],
           ),
-          const SizedBox(height: 8),
         ],
       ),
     );
@@ -630,7 +783,6 @@ class _WeatherScreenState extends State<WeatherScreen>
     final aqi = airQualityData['main']['aqi'] as int;
     final aqiLevel = _getAirQualityLevel(aqi);
     final aqiColor = _getAirQualityColor(aqi);
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Card(
@@ -725,7 +877,6 @@ class _WeatherScreenState extends State<WeatherScreen>
       itemBuilder: (context, index) {
         final forecast = _hourlyForecast[index];
         final hour = DateFormat('ha').format(forecast.date);
-
         return Container(
           width: 80,
           margin: const EdgeInsets.symmetric(horizontal: 8.0),
@@ -733,12 +884,23 @@ class _WeatherScreenState extends State<WeatherScreen>
             children: [
               Text(hour, style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Image.network(
-                'https://openweathermap.org/img/wn/${forecast.icon}.png',
+              CachedNetworkImage(
+                imageUrl:
+                    'https://openweathermap.org/img/wn/${forecast.icon}.png',
                 width: 40,
                 height: 40,
-                errorBuilder:
-                    (context, error, stackTrace) =>
+                memCacheWidth: 80,
+                memCacheHeight: 80,
+                placeholder:
+                    (context, url) => const SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                errorWidget:
+                    (context, url, error) =>
                         const Icon(Icons.cloud, size: 40, color: Colors.grey),
               ),
               const SizedBox(height: 8),
@@ -774,7 +936,6 @@ class _WeatherScreenState extends State<WeatherScreen>
       itemCount: _dailyForecast.length,
       itemBuilder: (context, index) {
         final forecast = _dailyForecast[index];
-
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: Row(
@@ -789,12 +950,23 @@ class _WeatherScreenState extends State<WeatherScreen>
               Expanded(
                 child: Row(
                   children: [
-                    Image.network(
-                      'https://openweathermap.org/img/wn/${forecast.icon}.png',
+                    CachedNetworkImage(
+                      imageUrl:
+                          'https://openweathermap.org/img/wn/${forecast.icon}.png',
                       width: 40,
                       height: 40,
-                      errorBuilder:
-                          (context, error, stackTrace) => const Icon(
+                      memCacheWidth: 80,
+                      memCacheHeight: 80,
+                      placeholder:
+                          (context, url) => const SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                      errorWidget:
+                          (context, url, error) => const Icon(
                             Icons.cloud,
                             size: 40,
                             color: Colors.grey,
@@ -914,7 +1086,6 @@ class _WeatherScreenState extends State<WeatherScreen>
     final zoom = 8;
     final url =
         'https://tile.openweathermap.org/map/$layer/$zoom/$lat/$lon.png?appid=${WeatherService.apiKey}';
-
     return Container(
       width: 140,
       margin: const EdgeInsets.symmetric(horizontal: 8.0),

@@ -3,11 +3,18 @@ import 'package:neusenews/widgets/app_drawer.dart';
 import 'package:neusenews/models/article.dart';
 import 'package:neusenews/services/news_service.dart';
 import 'package:neusenews/widgets/news_card.dart';
-import 'package:neusenews/widgets/in_feed_ad_banner.dart';
-import 'package:neusenews/models/ad.dart';
+import 'package:neusenews/widgets/app_bottom_navigation.dart';
+import 'package:neusenews/constants/app_colors.dart';
 
 class NewsScreen extends StatefulWidget {
-  const NewsScreen({super.key});
+  final List<String> sources;
+  final String title;
+
+  const NewsScreen({
+    super.key,
+    this.sources = const ['https://www.neusenews.com/index?format=rss'],
+    this.title = 'News',
+  });
 
   @override
   State<NewsScreen> createState() => _NewsScreenState();
@@ -28,14 +35,21 @@ class _NewsScreenState extends State<NewsScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final articles = await _newsService.fetchLocalNews();
+      List<Article> allArticles = [];
 
-      if (mounted) {
-        setState(() {
-          _articles = articles;
-          _isLoading = false;
-        });
+      // Fetch articles from all sources
+      for (String source in widget.sources) {
+        final articles = await _newsService.fetchNewsByUrl(source);
+        allArticles.addAll(articles);
       }
+
+      // Sort by publish date (newest first)
+      allArticles.sort((a, b) => b.publishDate.compareTo(a.publishDate));
+
+      setState(() {
+        _articles = allArticles;
+        _isLoading = false;
+      });
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -50,42 +64,38 @@ class _NewsScreenState extends State<NewsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('News'),
-        backgroundColor: const Color(0xFFd2982a),
+        title: Text(widget.title),
+        backgroundColor: AppColors.primary,
       ),
       drawer: const AppDrawer(),
       body: RefreshIndicator(
         onRefresh: _loadArticles,
         child:
             _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                )
                 : _articles.isEmpty
-                ? const Center(child: Text('No articles found'))
+                ? const Center(child: Text('No news available'))
                 : ListView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  itemCount: _articles.length + _articles.length ~/ 5,
+                  padding: const EdgeInsets.all(8),
+                  itemCount: _articles.length,
                   itemBuilder: (context, index) {
-                    // Show an ad every 5 items
-                    if (index > 0 && index % 6 == 0) {
-                      return const InFeedAdBanner(adType: AdType.inFeedNews);
-                    }
-
-                    // Adjust the article index to account for ads
-                    final articleIndex = index - index ~/ 6;
+                    final article = _articles[index];
                     return NewsCard(
-                      article: _articles[articleIndex],
+                      article: article,
                       onReadMore: () {
                         Navigator.pushNamed(
                           context,
                           '/article',
-                          arguments: _articles[articleIndex],
+                          arguments: article,
                         );
                       },
                     );
                   },
                 ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: AppBottomNavigation(
         currentIndex: 1, // News tab is active
         onTap: (index) {
           switch (index) {
@@ -98,20 +108,11 @@ class _NewsScreenState extends State<NewsScreen> {
             case 2: // Weather
               Navigator.pushReplacementNamed(context, '/weather');
               break;
-            case 3: // Calendar
+            case 3: // Events
               Navigator.pushReplacementNamed(context, '/calendar');
               break;
           }
         },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.newspaper), label: 'News'),
-          BottomNavigationBarItem(icon: Icon(Icons.cloud), label: 'Weather'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.calendar_month),
-            label: 'Calendar',
-          ),
-        ],
       ),
     );
   }

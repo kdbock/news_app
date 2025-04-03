@@ -126,7 +126,7 @@ class NewsSearchDelegate extends SearchDelegate<String> {
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
-            '${article.author} · ${_formatDate(article.publishDate)}',
+            '${article.author ?? 'Neuse News'} · ${_formatDate(article.publishDate)}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -194,16 +194,19 @@ class NewsSearchDelegate extends SearchDelegate<String> {
     );
   }
 
+  // Update the _searchArticles method to avoid accessing excerpt
   List<Article> _searchArticles(String query) {
     return _allArticles.where((article) {
       final title = article.title.toLowerCase();
-      final author = article.author.toLowerCase();
-      final content = article.excerpt.toLowerCase();
+      final authorText = (article.author ?? '').toLowerCase();
+      final contentText =
+          article.description
+              .toLowerCase(); // Use description instead of excerpt
       final searchLower = query.toLowerCase();
 
       return title.contains(searchLower) ||
-          author.contains(searchLower) ||
-          content.contains(searchLower);
+          authorText.contains(searchLower) ||
+          contentText.contains(searchLower);
     }).toList();
   }
 

@@ -34,11 +34,14 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-
-  pod 'Firebase/Core', '11.8.0'
-  pod 'Firebase/Auth', '11.8.0'
-  pod 'Firebase/Firestore', '11.8.0'
-  pod 'Firebase/Messaging', '11.8.0'
+  
+  # Force all Firebase pods to use 11.10.0 (to match the cloud_functions requirement)
+pod 'Firebase/Core', '10.25.0'
+pod 'Firebase/Auth', '10.25.0'
+pod 'Firebase/Firestore', '10.25.0'
+pod 'Firebase/Storage', '10.25.0'
+pod 'Firebase/Messaging', '10.25.0'
+pod 'Firebase/Functions', '10.25.0'
 end
 
 # Helper method to remove problematic flags

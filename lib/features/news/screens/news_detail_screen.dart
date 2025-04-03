@@ -101,7 +101,13 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                           }
 
                           // Adjust the article index to account for ads
-                          final articleIndex = index - index ~/ 6;
+                          final articleIndex = index - (index ~/ 6);
+
+                          // Add safety check to prevent index out of range
+                          if (articleIndex >= _articles.length) {
+                            return const SizedBox.shrink();
+                          }
+
                           return NewsCard(
                             article: _articles[articleIndex],
                             onReadMore: () {

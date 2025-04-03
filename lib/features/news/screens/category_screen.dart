@@ -12,6 +12,11 @@ class CategoryScreen extends StatefulWidget {
   final Color categoryColor;
   final bool showAppBar;
   final bool showBottomNav;
+  final Color navBarBackgroundColor;
+  final Color navBarSelectedItemColor;
+  final Color navBarUnselectedItemColor;
+  final bool useBackButton;
+  final List<Widget> appBarActions;
 
   const CategoryScreen({
     super.key,
@@ -20,6 +25,11 @@ class CategoryScreen extends StatefulWidget {
     this.categoryColor = const Color(0xFFd2982a),
     this.showAppBar = true,
     this.showBottomNav = true,
+    this.navBarBackgroundColor = const Color(0xFFd2982a),
+    this.navBarSelectedItemColor = Colors.white,
+    this.navBarUnselectedItemColor = Colors.white70,
+    this.useBackButton = false,
+    this.appBarActions = const [],
   });
 
   @override
@@ -96,10 +106,11 @@ class _CategoryScreenState extends State<CategoryScreen> {
               ? const Center(child: Text('No articles found'))
               : NotificationListener<ScrollNotification>(
                 onNotification: (ScrollNotification scrollInfo) {
-                  if (scrollInfo.metrics.pixels ==
-                          scrollInfo.metrics.maxScrollExtent &&
-                      !_isLoading &&
-                      _hasMoreData) {
+                  // Trigger slightly before reaching the end to improve UX
+                  if (!_isLoading &&
+                      _hasMoreData &&
+                      scrollInfo.metrics.pixels >
+                          scrollInfo.metrics.maxScrollExtent - 200) {
                     _loadArticles();
                     return true;
                   }
@@ -146,20 +157,14 @@ class _CategoryScreenState extends State<CategoryScreen> {
               ? AppBar(
                 title: Text(widget.category),
                 backgroundColor: widget.categoryColor,
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.search),
-                    onPressed: () {
-                      // Search implementation
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.notifications),
-                    onPressed: () {
-                      // Notification implementation
-                    },
-                  ),
-                ],
+                leading:
+                    widget.useBackButton
+                        ? IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () => Navigator.of(context).pop(),
+                        )
+                        : null,
+                actions: widget.appBarActions,
               )
               : null,
       drawer: widget.showAppBar ? const AppDrawer() : null,
@@ -167,6 +172,9 @@ class _CategoryScreenState extends State<CategoryScreen> {
       bottomNavigationBar:
           widget.showBottomNav
               ? BottomNavigationBar(
+                backgroundColor: widget.navBarBackgroundColor,
+                selectedItemColor: widget.navBarSelectedItemColor,
+                unselectedItemColor: widget.navBarUnselectedItemColor,
                 currentIndex: 1, // News tab is active
                 onTap: (index) {
                   switch (index) {

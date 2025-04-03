@@ -5,6 +5,8 @@ import 'package:neusenews/services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io' show Platform;
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:provider/provider.dart';
+import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 
 class AuthScreen extends StatefulWidget {
   final int initialTab;
@@ -71,29 +73,49 @@ class _AuthScreenState extends State<AuthScreen>
 
   Future<void> _login() async {
     setState(() => _isLoading = true);
+    _errorMessage = ''; // Clear any previous errors
 
     try {
-      print("Attempting login with: ${_emailController.text.trim()}");
+      debugPrint("Attempting login with: ${_emailController.text.trim()}");
 
-      // Use your AuthService instead of the Provider
-      // This avoids the Provider context issues
-      final user = await _authService.login(
+      // Get the auth provider
+      final authProvider = Provider.of<app_auth.AuthProvider>(
+        context,
+        listen: false,
+      );
+
+      // Use the login method from AuthProvider
+      final user = await authProvider.login(
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
 
-      print("Login result: ${user != null ? 'Success' : 'Failed'}");
+      debugPrint("Login result: ${user != null ? 'Success' : 'Failed'}");
 
-      if (user != null && mounted) {
+      // Check if actually logged in despite potential errors
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if ((user != null || currentUser != null) && mounted) {
         Navigator.pushReplacementNamed(context, '/dashboard');
+        return;
       }
     } on FirebaseAuthException catch (e) {
-      print("Firebase Auth Exception: ${e.code} - ${e.message}");
+      debugPrint("Firebase Auth Exception: ${e.code} - ${e.message}");
       setState(() {
         _errorMessage = _getFirebaseError(e.code);
       });
     } catch (e) {
-      print("Generic error: $e");
+      debugPrint("Generic error: $e");
+
+      // Special handling for the type casting error
+      if (e.toString().contains('PigeonUserDetails')) {
+        // Check if actually logged in despite the error
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null && mounted) {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+          return;
+        }
+      }
+
       setState(() {
         _errorMessage = 'An unexpected error occurred. Please try again.';
       });
@@ -232,19 +254,7 @@ class _AuthScreenState extends State<AuthScreen>
       }
 
       if (Platform.isAndroid) {
-        final appleCredential = await SignInWithApple.getAppleIDCredential(
-          scopes: [
-            AppleIDAuthorizationScopes.email,
-            AppleIDAuthorizationScopes.fullName,
-          ],
-          webAuthenticationOptions: WebAuthenticationOptions(
-            clientId:
-                '236600949564-5nsalftfmgc6u1r3am1lcsbpp14m71ct.apps.googleusercontent.com', // Use your Web Client ID
-            redirectUri: Uri.parse(
-              'https://neuse-news-df5fd.firebaseapp.com/__/auth/handler',
-            ), // Use your Redirect URI
-          ),
-        );
+        throw Exception('Apple Sign In is not supported on Android devices');
       } else {
         final appleCredential = await SignInWithApple.getAppleIDCredential(
           scopes: [
@@ -336,12 +346,13 @@ class _AuthScreenState extends State<AuthScreen>
         const SizedBox(height: 20),
         const Text('Or sign in with', style: TextStyle(color: Colors.grey)),
         const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Wrap(
+          spacing: 16,
+          alignment: WrapAlignment.center,
           children: [
             ElevatedButton.icon(
               icon: Image.asset('assets/images/google_signin.png', height: 24),
-              label: const Text('Sign in with Google'),
+              label: const Text('Google'),
               onPressed: _signInWithGoogle,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
@@ -352,10 +363,9 @@ class _AuthScreenState extends State<AuthScreen>
                 ),
               ),
             ),
-            const SizedBox(width: 16),
             ElevatedButton.icon(
               icon: const Icon(Icons.apple, color: Colors.white),
-              label: const Text('Sign in with Apple'),
+              label: const Text('Apple'),
               onPressed: _signInWithApple,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black,
@@ -452,7 +462,7 @@ class _AuthScreenState extends State<AuthScreen>
             children: [
               Row(
                 children: [
-                  Expanded(
+                  Flexible(
                     child: TextFormField(
                       controller: _firstNameController,
                       decoration: const InputDecoration(
@@ -462,7 +472,7 @@ class _AuthScreenState extends State<AuthScreen>
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Expanded(
+                  Flexible(
                     child: TextFormField(
                       controller: _lastNameController,
                       decoration: const InputDecoration(

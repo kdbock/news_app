@@ -3,6 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'dart:io'; // Add this import for File type
 import 'firebase_options.dart';
 
+// Add this import
+import 'package:neusenews/constants/app_colors.dart';
+
 // Core screens
 import 'package:neusenews/screens/splash_screen.dart';
 import 'package:neusenews/screens/dashboard_screen.dart';
@@ -13,7 +16,6 @@ import 'package:neusenews/features/user/screens/login_screen.dart';
 import 'package:neusenews/features/user/screens/profile_screen.dart';
 import 'package:neusenews/features/user/screens/edit_profile_screen.dart';
 import 'package:neusenews/features/user/screens/investor_dashboard_screen.dart';
-import 'package:neusenews/features/user/screens/my_contributions_screen.dart';
 import 'package:neusenews/features/user/screens/submit_sponsored_article.dart';
 
 // News features - using namespaced imports to avoid ambiguity
@@ -33,7 +35,6 @@ import 'package:neusenews/features/news/screens/classifieds_screen.dart'
     as classifieds;
 import 'package:neusenews/features/news/screens/matters_of_record.dart'
     as matters_of_record;
-import 'package:neusenews/features/news/screens/news_detail_screen.dart';
 import 'package:neusenews/features/news/screens/submit_news_tip.dart';
 
 // Weather features
@@ -61,17 +62,34 @@ import 'package:neusenews/features/admin/screens/admin_users_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 
-Future<void> main() async {
+// Update your main function to handle Firebase initialization more gracefully
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Check if Firebase is already initialized to prevent duplicate initialization
-  if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+  try {
+    // Check if Firebase is already initialized first
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      debugPrint('Firebase initialized successfully');
+    } else {
+      debugPrint('Firebase was already initialized');
+    }
+  } catch (e) {
+    debugPrint('Firebase initialization error: $e');
+    // Continue with app startup even if Firebase init fails
   }
 
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => app_auth.AuthProvider()),
+        // Add other providers here
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -79,110 +97,87 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider<app_auth.AuthProvider>(
-          create: (_) => app_auth.AuthProvider(),
+    return MaterialApp(
+      title: 'Neuse News',
+      theme: ThemeData(
+        primaryColor: AppColors.primary,
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary),
+        appBarTheme: AppBarTheme(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
         ),
-        // Add other providers here if needed
-      ],
-      child: MaterialApp(
-        title: 'Neuse News',
-        theme: ThemeData(
-          primaryColor: const Color(0xFFd2982a),
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFd2982a)),
-          // Add more theme configuration for consistency
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Color(0xFFd2982a),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
-            elevation: 0,
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFd2982a),
-              foregroundColor: Colors.white,
-            ),
           ),
         ),
-        // Always start with splash screen regardless of auth status
-        home: const SplashScreen(),
-        routes: {
-          // Core screens
-          '/splash': (context) => const SplashScreen(),
-          '/home': (context) => const DashboardScreen(),
-          '/dashboard': (context) => const DashboardScreen(),
-          '/settings': (context) => const SettingsScreen(),
-
-          // Auth and user screens
-          '/login': (context) => const AuthScreen(),
-          '/register': (context) => const AuthScreen(initialTab: 1),
-          '/profile': (context) => const ProfileScreen(),
-          '/edit_profile':
-              (context) => const EditProfileScreen(
-                firstName: '',
-                lastName: '',
-                email: '',
-                phone: '',
-                zipCode: '',
-                birthday: '',
-                textAlerts: false,
-                dailyDigest: false,
-                sportsNewsletter: false,
-                politicalNewsletter: false,
-              ),
-          '/investor-dashboard': (context) => const InvestorDashboardScreen(),
-          '/my-contributions': (context) => const MyContributionsScreen(),
-
-          // News screens
-          '/article': (context) => const ArticleDetailScreen(),
-          '/news': (context) => const NewsScreen(),
-          '/local-news': (context) => const local_news.LocalNewsScreen(),
-          '/politics': (context) => const politics.PoliticsScreen(),
-          '/sports': (context) => const sports.SportsScreen(),
-          '/obituaries': (context) => const obituaries.ObituariesScreen(),
-          '/columns': (context) => const columns.ColumnsScreen(),
-          '/public-notices':
-              (context) => const public_notices.PublicNoticesScreen(),
-          '/classifieds': (context) => const classifieds.ClassifiedsScreen(),
-          '/matters-of-record':
-              (context) => const matters_of_record.MattersOfRecordScreen(),
-          '/submit-news-tip': (context) => const SubmitNewsTipScreen(),
-
-          // Weather screens
-          '/weather': (context) => const WeatherScreen(),
-
-          // Events screens
-          '/calendar': (context) => const CalendarScreen(),
-          '/submit-sponsored-event':
-              (context) => const SubmitSponsoredEventScreen(),
-          '/submit-sponsored-article':
-              (context) => const SubmitSponsoredArticleScreen(),
-
-          // Ads screens
-          '/advertising-options': (context) => const AdvertisingOptionsScreen(),
-          '/create-ad': (context) => const AdCreationScreen(),
-
-          // Using wrapper classes for screens that require parameters
-          '/ad-checkout': (context) => const AdCheckoutWrapper(),
-          '/ad-confirmation': (context) => const AdConfirmationWrapper(),
-          '/advertiser-dashboard':
-              (context) => const AdvertiserDashboardScreen(),
-
-          // Admin screens
-          '/admin-dashboard': (context) => const AdminDashboardScreen(),
-          '/review-ads': (context) => const ReviewAdsScreen(),
-          '/review-sponsored-content':
-              (context) => const ReviewSponsoredContentScreen(),
-          '/admin-users': (context) => const AdminUsersScreen(),
-        },
       ),
+      // Always start with splash screen regardless of auth status
+      home: const SplashScreen(),
+      routes: {
+        // Core screens
+        '/splash': (context) => const SplashScreen(),
+        '/home': (context) => const DashboardScreen(),
+        '/dashboard': (context) => const DashboardScreen(),
+        '/settings': (context) => const SettingsScreen(),
+
+        // Auth and user screens
+        '/login': (context) => const AuthScreen(),
+        '/register': (context) => const AuthScreen(initialTab: 1),
+        '/profile': (context) => const ProfileScreen(),
+        '/edit-profile': (context) => const EditProfileScreen(),
+        '/investor-dashboard': (context) => const InvestorDashboardScreen(),
+
+        // News screens
+        '/article': (context) => const ArticleDetailScreen(),
+        '/news': (context) => const NewsScreen(),
+        '/local-news': (context) => const local_news.LocalNewsScreen(),
+        '/politics': (context) => const politics.PoliticsScreen(),
+        '/sports': (context) => const sports.SportsScreen(),
+        '/obituaries': (context) => const obituaries.ObituariesScreen(),
+        '/columns': (context) => const columns.ColumnsScreen(),
+        '/public-notices':
+            (context) => const public_notices.PublicNoticesScreen(),
+        '/classifieds': (context) => const classifieds.ClassifiedsScreen(),
+        '/matters-of-record':
+            (context) => const matters_of_record.MattersOfRecordScreen(),
+        '/submit-news-tip': (context) => const SubmitNewsTipScreen(),
+
+        // Weather screens
+        '/weather': (context) => const WeatherScreen(),
+
+        // Events screens
+        '/calendar': (context) => const CalendarScreen(),
+        '/submit-sponsored-event':
+            (context) => const SubmitSponsoredEventScreen(),
+        '/submit-sponsored-article':
+            (context) => const SubmitSponsoredArticleScreen(),
+
+        // Ads screens
+        '/advertising-options': (context) => const AdvertisingOptionsScreen(),
+        '/create-ad': (context) => const AdCreationScreen(),
+
+        // Using wrapper classes for screens that require parameters
+        '/ad-checkout': (context) => const AdCheckoutWrapper(),
+        '/ad-confirmation': (context) => const AdConfirmationWrapper(),
+        '/advertiser-dashboard': (context) => const AdvertiserDashboardScreen(),
+
+        // Admin screens
+        '/admin-dashboard': (context) => const AdminDashboardScreen(),
+        '/review-ads': (context) => const ReviewAdsScreen(),
+        '/review-sponsored-content':
+            (context) => const ReviewSponsoredContentScreen(),
+        '/admin-users': (context) => const AdminUsersScreen(),
+      },
     );
   }
 }
 
 // Wrapper class for AdCheckoutScreen that handles the required ad parameter
 class AdCheckoutWrapper extends StatelessWidget {
-  const AdCheckoutWrapper({Key? key}) : super(key: key);
+  const AdCheckoutWrapper({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +217,7 @@ class AdCheckoutWrapper extends StatelessWidget {
 
 // Wrapper class for AdConfirmationScreen that handles the required ad parameter
 class AdConfirmationWrapper extends StatelessWidget {
-  const AdConfirmationWrapper({Key? key}) : super(key: key);
+  const AdConfirmationWrapper({super.key});
 
   @override
   Widget build(BuildContext context) {
