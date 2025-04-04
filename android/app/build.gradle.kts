@@ -50,6 +50,7 @@ android {
         targetSdkVersion(34)
         versionCode = 3 // Increment this for every new release
         versionName = "1.1.0" // Update this to the new version name
+        multiDexEnabled = true
     }
 
     buildTypes {
@@ -79,6 +80,7 @@ dependencies {
     
     // Add Stripe dependencies explicitly
     implementation("com.stripe:stripe-android:20.29.1") 
+    implementation("androidx.multidex:multidex:2.0.1")
 }
 
 flutter {
