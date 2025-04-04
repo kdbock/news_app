@@ -16,13 +16,21 @@ class ColumnsScreen extends StatelessWidget {
     return CategoryScreen(
       category: 'Columns',
       url: 'https://www.neusenews.com/index/category/Columns?format=rss',
-      categoryColor: const Color(
-        0xFFd2982a,
-      ), // Using your app's theme color instead of plain yellow
+      categoryColor: const Color(0xFFd2982a),
       showAppBar: showAppBar,
       showBottomNav: showBottomNav,
-      // Removed the undefined parameter
-      // Removed the undefined parameter
+      navBarBackgroundColor: const Color(0xFFd2982a), // Match your theme
+      navBarSelectedItemColor: Colors.white,
+      navBarUnselectedItemColor: Colors.white70,
+      useBackButton: true,
+      appBarActions: [
+        IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: () {
+            // Add search functionality
+          },
+        ),
+      ],
     );
   }
 }

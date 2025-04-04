@@ -535,24 +535,6 @@ class _AdvertiserDashboardScreenState extends State<AdvertiserDashboardScreen>
             final impressions = ad['impressions'] as int? ?? 0;
             final clicks = ad['clicks'] as int? ?? 0;
 
-            // Get status color
-            Color statusColor;
-            switch (adStatus) {
-              case AdStatus.active:
-                statusColor = Colors.green;
-                break;
-              case AdStatus.pending:
-                statusColor = Colors.orange;
-                break;
-              case AdStatus.rejected:
-                statusColor = Colors.red;
-                break;
-              case AdStatus.expired:
-              case AdStatus.deleted:
-                statusColor = Colors.grey;
-                break;
-            }
-
             return Card(
               margin: const EdgeInsets.only(bottom: 12.0),
               child: ListTile(
@@ -590,14 +572,14 @@ class _AdvertiserDashboardScreenState extends State<AdvertiserDashboardScreen>
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withAlpha(25),
-                    border: Border.all(color: statusColor),
+                    color: getStatusColor(adStatus).withAlpha(25),
+                    border: Border.all(color: getStatusColor(adStatus)),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     _getStatusDisplayName(adStatus),
                     style: TextStyle(
-                      color: statusColor,
+                      color: getStatusColor(adStatus),
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -742,6 +724,22 @@ class _AdvertiserDashboardScreenState extends State<AdvertiserDashboardScreen>
         return 'Expired';
       case AdStatus.deleted:
         return 'Deleted';
+    }
+  }
+
+  Color getStatusColor(AdStatus? status) {
+    switch (status) {
+      case AdStatus.active:
+        return Colors.green;
+      case AdStatus.pending:
+        return Colors.orange;
+      case AdStatus.rejected:
+        return Colors.red;
+      case AdStatus.expired:
+      case AdStatus.deleted:
+        return Colors.grey;
+      default:
+        return Colors.grey;
     }
   }
 

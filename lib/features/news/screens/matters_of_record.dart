@@ -20,6 +20,18 @@ class MattersOfRecordScreen extends StatelessWidget {
       categoryColor: const Color(0xFFd2982a),
       showAppBar: showAppBar,
       showBottomNav: showBottomNav,
+      navBarBackgroundColor: const Color(0xFFd2982a), // Match your theme
+      navBarSelectedItemColor: Colors.white,
+      navBarUnselectedItemColor: Colors.white70,
+      useBackButton: true,
+      appBarActions: [
+        IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: () {
+            // Add search functionality
+          },
+        ),
+      ],
     );
   }
 }

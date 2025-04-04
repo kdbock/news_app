@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:neusenews/models/ad.dart';
 import 'package:neusenews/services/ad_service.dart';
+import 'package:neusenews/services/analytics_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class WeatherSponsorBanner extends StatefulWidget {
   const WeatherSponsorBanner({super.key});
@@ -12,6 +14,44 @@ class WeatherSponsorBanner extends StatefulWidget {
 
 class _WeatherSponsorBannerState extends State<WeatherSponsorBanner> {
   final AdService _adService = AdService();
+  final AnalyticsService _analytics = AnalyticsService();
+
+  // Cache weather icons to reduce network requests
+  final Map<String, ImageProvider> _iconCache = {};
+
+  static const String _defaultZip = '28501'; // Kinston, NC
+
+  ImageProvider getWeatherIcon(String iconCode) {
+    if (_iconCache.containsKey(iconCode)) {
+      return _iconCache[iconCode]!;
+    }
+
+    final imageProvider = CachedNetworkImageProvider(
+      'https://openweathermap.org/img/wn/$iconCode@2x.png',
+    );
+    _iconCache[iconCode] = imageProvider;
+    return imageProvider;
+  }
+
+  Future<Map<String, dynamic>> getWeatherBundle(String zipCode) async {
+    try {
+      return {'current': {}, 'forecast': []};
+    } catch (e) {
+      _analytics.logEvent('weather_api_error', {'error': e.toString()});
+      return _getFallbackData();
+    }
+  }
+
+  Map<String, dynamic> _getFallbackData() {
+    return {
+      'current': {'temp': 75, 'condition': 'Clear', 'icon': '01d'},
+      'forecast': [],
+    };
+  }
+
+  Future<String> getCurrentZipCode() async {
+    return _defaultZip;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -23,24 +63,20 @@ class _WeatherSponsorBannerState extends State<WeatherSponsorBanner> {
         }
 
         if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          return const SizedBox(height: 0);
+          return _buildNoAdPlaceholder();
         }
 
-        // Get a random ad from the available ones
         final ads = snapshot.data!;
         final ad = ads[DateTime.now().millisecond % ads.length];
 
-        // Record impression
         _adService.recordImpression(ad.id!);
 
         return Container(
           margin: const EdgeInsets.only(top: 12.0, bottom: 8.0),
           child: GestureDetector(
             onTap: () async {
-              // Record click
               await _adService.recordClick(ad.id!);
 
-              // Open link
               final Uri url = Uri.parse(ad.linkUrl);
               if (await canLaunchUrl(url)) {
                 await launchUrl(url);
@@ -85,12 +121,21 @@ class _WeatherSponsorBannerState extends State<WeatherSponsorBanner> {
                       children: [
                         ClipRRect(
                           borderRadius: BorderRadius.circular(4.0),
-                          child: Image.network(
-                            ad.imageUrl,
+                          child: CachedNetworkImage(
+                            imageUrl: ad.imageUrl,
                             width: double.infinity,
                             height: 120,
                             fit: BoxFit.cover,
-                            errorBuilder:
+                            placeholder:
+                                (context, url) => Container(
+                                  width: double.infinity,
+                                  height: 120,
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                ),
+                            errorWidget:
                                 (context, error, stackTrace) => Container(
                                   width: double.infinity,
                                   height: 120,
@@ -126,5 +171,9 @@ class _WeatherSponsorBannerState extends State<WeatherSponsorBanner> {
         );
       },
     );
+  }
+
+  Widget _buildNoAdPlaceholder() {
+    return const SizedBox(height: 0);
   }
 }

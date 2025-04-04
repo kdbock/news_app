@@ -41,7 +41,10 @@ class DefaultFirebaseOptions {
   }
 
   static FirebaseOptions get android => FirebaseOptions(
-    apiKey: const String.fromEnvironment('FIREBASE_ANDROID_API_KEY'),
+    apiKey: const String.fromEnvironment(
+      'FIREBASE_ANDROID_API_KEY',
+      defaultValue: 'YOUR_DEFAULT_KEY',
+    ),
     appId: const String.fromEnvironment('FIREBASE_ANDROID_APP_ID'),
     messagingSenderId: '236600949564',
     projectId: 'neuse-news-df5fd',
@@ -56,7 +59,8 @@ class DefaultFirebaseOptions {
     projectId: 'neuse-news-df5fd',
     databaseURL: 'https://neuse-news-df5fd-default-rtdb.firebaseio.com',
     storageBucket: 'neuse-news-df5fd.firebasestorage.app',
-    iosClientId: '236600949564-nrl089v9mqt33l2sfpdmdttangdtr01a.apps.googleusercontent.com',
+    iosClientId:
+        '236600949564-nrl089v9mqt33l2sfpdmdttangdtr01a.apps.googleusercontent.com',
     iosBundleId: 'com.wordnerd.neusenews',
   );
 
@@ -77,7 +81,8 @@ class DefaultFirebaseOptions {
     projectId: 'neuse-news-df5fd',
     databaseURL: 'https://neuse-news-df5fd-default-rtdb.firebaseio.com',
     storageBucket: 'neuse-news-df5fd.firebasestorage.app',
-    iosClientId: '236600949564-eclf8t63s95aaasic4emeol55eh32hdt.apps.googleusercontent.com',
+    iosClientId:
+        '236600949564-eclf8t63s95aaasic4emeol55eh32hdt.apps.googleusercontent.com',
     iosBundleId: 'n',
   );
 
@@ -90,5 +95,4 @@ class DefaultFirebaseOptions {
     databaseURL: 'https://neuse-news-df5fd-default-rtdb.firebaseio.com',
     storageBucket: 'neuse-news-df5fd.firebasestorage.app',
   );
-
 }

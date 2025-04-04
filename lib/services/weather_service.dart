@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:neusenews/models/weather_data.dart';
 import 'package:neusenews/models/weather_forecast.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class WeatherService {
   // Make this accessible to the weather screen
@@ -12,6 +13,23 @@ class WeatherService {
 
   // Add default ZIP code
   final String _defaultZip = '28501'; // Kinston, NC
+
+  // Add these properties to track client requests
+  final client = http.Client();
+  final Map<String, http.Client> _activeRequests = {};
+
+  // Update cancelRequests method
+  void cancelRequests() {
+    _activeRequests.forEach((_, client) {
+      try {
+        client.close();
+      } catch (e) {
+        debugPrint('Error closing client: $e');
+      }
+    });
+    _activeRequests.clear();
+    debugPrint('WeatherService: All requests canceled');
+  }
 
   // Add the getForecast method for the dashboard with fallback data
   Future<List<WeatherForecast>> getForecast() async {
@@ -27,70 +45,28 @@ class WeatherService {
 
   // Fallback forecast data for when the API fails
   List<WeatherForecast> _getFallbackForecast() {
-    final DateTime now = DateTime.now();
-
+    final now = DateTime.now();
     return [
       WeatherForecast(
         date: now,
         day: 'Today',
         condition: 'Clear',
-        temp: 75.0,
-        tempMin: 68.0,
-        tempMax: 82.0,
+        temp: 75,
+        tempMin: 70,
+        tempMax: 80,
         icon: '01d',
         pop: 0.0,
-        uvIndex: 6.0,
       ),
-      WeatherForecast(
-        date: now.add(const Duration(days: 1)),
-        day: 'Tomorrow',
-        condition: 'Clouds',
-        temp: 73.0,
-        tempMin: 65.0,
-        tempMax: 79.0,
-        icon: '02d',
-        pop: 0.1,
-        uvIndex: 5.0,
-      ),
-      WeatherForecast(
-        date: now.add(const Duration(days: 2)),
-        day: _getDayName(now.add(const Duration(days: 2))),
-        condition: 'Rain',
-        temp: 68.0,
-        tempMin: 62.0,
-        tempMax: 74.0,
-        icon: '10d',
-        pop: 0.6,
-        uvIndex: 3.0,
-      ),
-      WeatherForecast(
-        date: now.add(const Duration(days: 3)),
-        day: _getDayName(now.add(const Duration(days: 3))),
-        condition: 'Clouds',
-        temp: 70.0,
-        tempMin: 64.0,
-        tempMax: 76.0,
-        icon: '03d',
-        pop: 0.2,
-        uvIndex: 4.0,
-      ),
-      WeatherForecast(
-        date: now.add(const Duration(days: 4)),
-        day: _getDayName(now.add(const Duration(days: 4))),
-        condition: 'Clear',
-        temp: 77.0,
-        tempMin: 68.0,
-        tempMax: 84.0,
-        icon: '01d',
-        pop: 0.0,
-        uvIndex: 7.0,
-      ),
+      // Add more fallback days if needed
     ];
   }
 
   Future<WeatherData> getCurrentWeather(String zipCode) async {
+    final client = http.Client();
+    _activeRequests['current_$zipCode'] = client;
+
     try {
-      final response = await http.get(
+      final response = await client.get(
         Uri.parse(
           '$_baseUrl/weather?zip=$zipCode,us&units=imperial&appid=$apiKey',
         ),
@@ -125,6 +101,8 @@ class WeatherService {
             DateTime.now().millisecondsSinceEpoch ~/ 1000 +
             43200, // 12 hours from now
       );
+    } finally {
+      _activeRequests.remove('current_$zipCode');
     }
   }
 
@@ -216,59 +194,51 @@ class WeatherService {
 
   Future<List<WeatherForecast>> getDailyForecast(String zipCode) async {
     try {
-      // First get coordinates from ZIP code
-      final coordsResponse = await http.get(
-        Uri.parse('$_geoUrl/zip?zip=$zipCode,us&appid=$apiKey'),
-      );
-
-      if (coordsResponse.statusCode != 200) {
-        debugPrint(
-          'Geocoding API error: ${coordsResponse.statusCode} - ${coordsResponse.body}',
-        );
-        throw Exception(
-          'Failed to get coordinates from ZIP code: ${coordsResponse.statusCode}',
-        );
-      }
-
-      final coordsData = jsonDecode(coordsResponse.body);
-      final lat = coordsData['lat'];
-      final lon = coordsData['lon'];
-
-      // Now get the daily forecast with OneCall API
+      // Use the 5-day forecast endpoint which is available in free tier
       final response = await http.get(
         Uri.parse(
-          '$_baseUrl/onecall?lat=$lat&lon=$lon&exclude=current,minutely,hourly,alerts&units=imperial&appid=$apiKey',
+          '$_baseUrl/forecast?zip=$zipCode,us&units=imperial&appid=$apiKey',
         ),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final List<dynamic> dailyList = data['daily'];
+        final List<dynamic> forecastList = data['list'];
 
-        // Take only the first 5 days
-        final limitedList = dailyList.take(5).toList();
+        // Group forecasts by day (free API gives 3-hour intervals)
+        final Map<String, WeatherForecast> dailyForecasts = {};
 
-        return limitedList.map<WeatherForecast>((item) {
+        for (var item in forecastList) {
           final timestamp = item['dt'] * 1000;
           final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+          final dayKey = '${date.year}-${date.month}-${date.day}';
 
-          double uvIndex = 0.0;
-          if (item.containsKey('uvi')) {
-            uvIndex = (item['uvi'] as num).toDouble();
+          // Take noon forecast as representative for the day
+          final hour = date.hour;
+          if (!dailyForecasts.containsKey(dayKey) ||
+              (hour >= 11 && hour <= 13)) {
+            dailyForecasts[dayKey] = WeatherForecast(
+              date: date,
+              day: _getDayName(date),
+              condition: item['weather'][0]['main'],
+              temp: (item['main']['temp'] as num).toDouble(),
+              tempMin: (item['main']['temp_min'] as num).toDouble(),
+              tempMax: (item['main']['temp_max'] as num).toDouble(),
+              icon: item['weather'][0]['icon'],
+              pop:
+                  item.containsKey('pop')
+                      ? (item['pop'] as num).toDouble()
+                      : 0.0,
+            );
           }
+        }
 
-          return WeatherForecast(
-            date: date,
-            day: _getDayName(date),
-            condition: item['weather'][0]['main'],
-            temp: (item['temp']['day'] as num).toDouble(),
-            tempMin: (item['temp']['min'] as num).toDouble(),
-            tempMax: (item['temp']['max'] as num).toDouble(),
-            icon: item['weather'][0]['icon'],
-            pop: item['pop'] != null ? (item['pop'] as num).toDouble() : 0.0,
-            uvIndex: uvIndex,
-          );
-        }).toList();
+        // Sort by date and return first 5 days
+        final sortedForecasts =
+            dailyForecasts.values.toList()
+              ..sort((a, b) => a.date.compareTo(b.date));
+
+        return sortedForecasts.take(5).toList();
       } else {
         debugPrint(
           'Daily forecast API error: ${response.statusCode} - ${response.body}',
@@ -279,7 +249,6 @@ class WeatherService {
       }
     } catch (e) {
       debugPrint('Error in getDailyForecast: $e');
-      // Return fallback forecast data
       return _getFallbackForecast();
     }
   }
@@ -363,33 +332,104 @@ class WeatherService {
     }
   }
 
+  Future<Map<String, dynamic>> _getCoordinatesFromZip(String zipCode) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_geoUrl/zip?zip=$zipCode,us&appid=$apiKey'),
+      );
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        debugPrint(
+          'Geocoding API error: ${response.statusCode} - ${response.body}',
+        );
+        throw Exception(
+          'Failed to get coordinates from ZIP code: ${response.statusCode}',
+        );
+      }
+    } catch (e) {
+      debugPrint('Error in _getCoordinatesFromZip: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<dynamic>> getWeatherAlerts(String zipCode) async {
+    try {
+      // Get coordinates from ZIP code
+      final coordsData = await _getCoordinatesFromZip(zipCode);
+      final lat = coordsData['lat'];
+      final lon = coordsData['lon'];
+
+      // Get alerts with OneCall API
+      final response = await http.get(
+        Uri.parse(
+          '$_baseUrl/onecall?lat=$lat&lon=$lon&exclude=current,minutely,hourly,daily&units=imperial&appid=$apiKey',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data.containsKey('alerts') ? data['alerts'] : [];
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getting weather alerts: $e');
+      return [];
+    }
+  }
+
+  Future<void> cacheWeatherData(
+    String zipCode,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('weather_data_$zipCode', jsonEncode(data));
+      await prefs.setInt(
+        'weather_cache_time',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    } catch (e) {
+      debugPrint('Error caching weather data: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> getCachedWeatherData(String zipCode) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheTime = prefs.getInt('weather_cache_time') ?? 0;
+
+      // Check if cache is less than 30 minutes old
+      final now = DateTime.now().millisecondsSinceEpoch;
+      if (now - cacheTime < 30 * 60 * 1000) {
+        final data = prefs.getString('weather_data_$zipCode');
+        if (data != null) {
+          return jsonDecode(data);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error getting cached weather: $e');
+    }
+    return null;
+  }
+
   static String _getDayName(DateTime date) {
     final now = DateTime.now();
-    final difference = date.difference(now).inDays;
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
 
-    if (difference == 0) {
+    if (date.year == today.year &&
+        date.month == today.month &&
+        date.day == today.day) {
       return 'Today';
-    } else if (difference == 1) {
+    } else if (date.year == tomorrow.year &&
+        date.month == tomorrow.month &&
+        date.day == tomorrow.day) {
       return 'Tomorrow';
-    } else {
-      switch (date.weekday) {
-        case DateTime.monday:
-          return 'Monday';
-        case DateTime.tuesday:
-          return 'Tuesday';
-        case DateTime.wednesday:
-          return 'Wednesday';
-        case DateTime.thursday:
-          return 'Thursday';
-        case DateTime.friday:
-          return 'Friday';
-        case DateTime.saturday:
-          return 'Saturday';
-        case DateTime.sunday:
-          return 'Sunday';
-        default:
-          return '';
-      }
     }
+
+    final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    return weekdays[date.weekday - 1];
   }
 }

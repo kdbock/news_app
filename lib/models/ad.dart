@@ -1,71 +1,65 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
-enum AdType {
-  titleSponsor, // 0
-  inFeedDashboard, // 1
-  inFeedNews, // 2
-  weather, // 3
-}
+enum AdType { titleSponsor, inFeedDashboard, inFeedNews, weather }
 
-enum AdStatus {
-  pending, // 0
-  active, // 1
-  rejected, // 2
-  expired, // 3
-  deleted, // 4
-}
+enum AdStatus { pending, active, expired, rejected, deleted }
 
 class Ad {
   final String? id;
-  final String businessId;
+  final String? businessId;
   final String businessName;
   final String headline;
   final String description;
-  final String imageUrl;
   final String linkUrl;
+  final String imageUrl;
   final AdType type;
-  final AdStatus status;
   final DateTime startDate;
   final DateTime endDate;
-  final int impressions;
-  final int clicks;
-  final double ctr;
-  final double cost;
+  final bool isActive;
+  final String? status;
+  final double cost; // Changed to non-nullable with default
+  final int impressions; // Added for analytics
+  final int clicks; // Added for analytics
+  final double ctr; // Added for analytics
 
   Ad({
     this.id,
-    required this.businessId,
+    this.businessId,
     required this.businessName,
     required this.headline,
     required this.description,
-    this.imageUrl = '',
     required this.linkUrl,
+    required this.imageUrl,
     required this.type,
-    required this.status,
     required this.startDate,
     required this.endDate,
+    required this.isActive,
+    this.status,
+    this.cost = 0.0, // Default value avoids null issues
     this.impressions = 0,
     this.clicks = 0,
     this.ctr = 0.0,
-    required this.cost,
   });
 
+  // Add copyWith method for updating ad properties
   Ad copyWith({
     String? id,
     String? businessId,
     String? businessName,
     String? headline,
     String? description,
-    String? imageUrl,
     String? linkUrl,
+    String? imageUrl,
     AdType? type,
-    AdStatus? status,
     DateTime? startDate,
     DateTime? endDate,
+    bool? isActive,
+    String? status,
+    double? cost,
     int? impressions,
     int? clicks,
     double? ctr,
-    double? cost,
   }) {
     return Ad(
       id: id ?? this.id,
@@ -73,57 +67,171 @@ class Ad {
       businessName: businessName ?? this.businessName,
       headline: headline ?? this.headline,
       description: description ?? this.description,
-      imageUrl: imageUrl ?? this.imageUrl,
       linkUrl: linkUrl ?? this.linkUrl,
+      imageUrl: imageUrl ?? this.imageUrl,
       type: type ?? this.type,
-      status: status ?? this.status,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
+      isActive: isActive ?? this.isActive,
+      status: status ?? this.status,
+      cost: cost ?? this.cost,
       impressions: impressions ?? this.impressions,
       clicks: clicks ?? this.clicks,
       ctr: ctr ?? this.ctr,
-      cost: cost ?? this.cost,
     );
   }
 
-  factory Ad.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return Ad(
-      id: doc.id,
-      businessId: data['businessId'] ?? '',
-      businessName: data['businessName'] ?? '',
-      headline: data['headline'] ?? '',
-      description: data['description'] ?? '',
-      imageUrl: data['imageUrl'] ?? '',
-      linkUrl: data['linkUrl'] ?? '',
-      type: AdType.values[data['type'] ?? 0],
-      status: AdStatus.values[data['status'] ?? 0],
-      startDate: (data['startDate'] as Timestamp).toDate(),
-      endDate: (data['endDate'] as Timestamp).toDate(),
-      impressions: (data['impressions'] as num?)?.toInt() ?? 0,
-      clicks: (data['clicks'] as num?)?.toInt() ?? 0,
-      ctr: (data['ctr'] as num?)?.toDouble() ?? 0.0,
-      cost: (data['cost'] as num?)?.toDouble() ?? 0.0,
-    );
-  }
-
+  // Add toFirestore method for Firestore serialization
   Map<String, dynamic> toFirestore() {
     return {
       'businessId': businessId,
       'businessName': businessName,
       'headline': headline,
       'description': description,
-      'imageUrl': imageUrl,
       'linkUrl': linkUrl,
-      'type': type.index,
-      'status': status.index,
+      'imageUrl': imageUrl,
+      'type': type.toString(),
       'startDate': Timestamp.fromDate(startDate),
       'endDate': Timestamp.fromDate(endDate),
+      'isActive': isActive,
+      'status': status ?? 'pending',
+      'cost': cost,
       'impressions': impressions,
       'clicks': clicks,
       'ctr': ctr,
-      'cost': cost,
-      'createdAt': Timestamp.now(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     };
+  }
+
+  factory Ad.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+
+    // Handle different type formats (string or integer)
+    AdType adType;
+    final typeValue = data['type'];
+
+    if (typeValue is int) {
+      // If type is stored as an integer index
+      if (typeValue >= 0 && typeValue < AdType.values.length) {
+        adType = AdType.values[typeValue];
+      } else {
+        adType =
+            AdType.titleSponsor; // Default to titleSponsor instead of banner
+      }
+    } else {
+      // This part is already handled correctly
+      try {
+        adType = AdType.values.firstWhere(
+          (e) =>
+              e.toString().split('.').last == typeValue ||
+              e.toString() == typeValue,
+          orElse: () => AdType.titleSponsor,
+        );
+      } catch (_) {
+        adType = AdType.titleSponsor;
+      }
+    }
+
+    // Fix the status field - convert int to string if needed
+    String? status;
+    dynamic statusValue = data['status'];
+    if (statusValue is int) {
+      // Convert int status to string
+      status = statusValue.toString();
+    } else if (statusValue is String) {
+      status = statusValue;
+    } else {
+      status = null; // Handle null case
+    }
+
+    // Cast other potentially problematic fields
+    final businessId = data['businessId']?.toString();
+    final businessName = data['businessName']?.toString() ?? '';
+    final headline = data['headline']?.toString() ?? '';
+    final description = data['description']?.toString() ?? '';
+    final imageUrl = data['imageUrl']?.toString() ?? '';
+    final linkUrl = data['linkUrl']?.toString() ?? '';
+
+    // Use the imported debugPrint
+    if (typeValue is! int) {
+      debugPrint('Ad ${doc.id}: Non-integer type value: $typeValue');
+    }
+
+    return Ad(
+      id: doc.id,
+      businessId: businessId,
+      businessName: businessName,
+      headline: headline,
+      description: description,
+      imageUrl: imageUrl,
+      linkUrl: linkUrl,
+      type: adType,
+      isActive: data['isActive'] ?? false,
+      startDate: (data['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      endDate:
+          (data['endDate'] as Timestamp?)?.toDate() ??
+          DateTime.now().add(const Duration(days: 30)),
+      status: status,
+      cost: (data['cost'] is num) ? (data['cost'] as num).toDouble() : 0.0,
+      impressions:
+          (data['impressions'] is num)
+              ? (data['impressions'] as num).toInt()
+              : 0,
+      clicks: (data['clicks'] is num) ? (data['clicks'] as num).toInt() : 0,
+      ctr: (data['ctr'] is num) ? (data['ctr'] as num).toDouble() : 0.0,
+    );
+  }
+
+  // Helper for converting AdType enum to string representation
+  static String adTypeToString(AdType type) {
+    switch (type) {
+      case AdType.titleSponsor:
+        return 'titleSponsor';
+      case AdType.inFeedDashboard:
+        return 'inFeedDashboard';
+      case AdType.inFeedNews:
+        return 'inFeedNews';
+      case AdType.weather:
+        return 'weather';
+    }
+  }
+
+  // Helper methods for AdStatus
+  static String getStatusString(AdStatus status) {
+    switch (status) {
+      case AdStatus.pending:
+        return 'pending';
+      case AdStatus.active:
+        return 'active';
+      case AdStatus.expired:
+        return 'expired';
+      case AdStatus.rejected:
+        return 'rejected';
+      case AdStatus.deleted:
+        return 'deleted';
+    }
+  }
+
+  static AdStatus getStatusFromString(String? statusStr) {
+    switch (statusStr) {
+      case 'active':
+        return AdStatus.active;
+      case 'pending':
+        return AdStatus.pending;
+      case 'expired':
+        return AdStatus.expired;
+      case 'rejected':
+        return AdStatus.rejected;
+      case 'deleted':
+        return AdStatus.deleted;
+      default:
+        return AdStatus.pending;
+    }
+  }
+
+  // Debug helper method instead of loose code at file level
+  static void debugAdTypes() {
+    debugPrint('AdType.titleSponsor value: ${AdType.titleSponsor.toString()}');
   }
 }

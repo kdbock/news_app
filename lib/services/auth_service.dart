@@ -1,204 +1,212 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'dart:math';
 
 class AuthService {
-  // Use non-nullable Firebase Auth
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
-  // Email/Password Login
+  // Login with email and password - Fixed to handle type casting errors
   Future<User?> login(String email, String password) async {
     try {
-      UserCredential result = await _auth.signInWithEmailAndPassword(
+      debugPrint("Attempting login with: $email");
+
+      final userCredential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      User? user = result.user;
+      final user = userCredential.user;
 
-      // Update last login time and ensure roles are set
+      if (user != null) {
+        try {
+          // Update lastLogin timestamp
+          await _firestore.collection('users').doc(user.uid).update({
+            'lastLogin': FieldValue.serverTimestamp(),
+          });
+
+          await updateUserRolesAfterLogin(user);
+        } catch (e) {
+          // Log error but don't fail the login
+          debugPrint("Error updating user data after login: $e");
+        }
+      }
+
+      return user;
+    } on FirebaseAuthException catch (e) {
+      debugPrint("Firebase Auth login error: ${e.code} - ${e.message}");
+      rethrow;
+    } catch (e) {
+      debugPrint("Generic login error: $e");
+
+      // Handle the specific type casting error
+      if (e.toString().contains('PigeonUserDetails')) {
+        debugPrint("Handling PigeonUserDetails casting error");
+        // The login actually succeeded but the post-processing failed
+        // Return the current user instead of throwing
+        return FirebaseAuth.instance.currentUser;
+      }
+
+      rethrow;
+    }
+  }
+
+  // Register with email and password
+  Future<User?> register(String email, String password) async {
+    try {
+      final userCredential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = userCredential.user;
+
+      if (user != null) {
+        // Create user document in Firestore
+        await _firestore.collection('users').doc(user.uid).set({
+          'email': email,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLogin': FieldValue.serverTimestamp(),
+          'isAdmin': false,
+          'isContributor': false,
+          'isInvestor': false,
+          'isCustomer': true,
+          'userType': 'customer',
+        });
+      }
+
+      return user;
+    } catch (e) {
+      debugPrint("Registration error: $e");
+      rethrow;
+    }
+  }
+
+  // Update user roles after login
+  Future<void> updateUserRolesAfterLogin(User user) async {
+    try {
+      final userDoc = _firestore.collection('users').doc(user.uid);
+      final userSnapshot = await userDoc.get();
+
+      if (!userSnapshot.exists) {
+        // If user document doesn't exist, create it
+        await userDoc.set({
+          'email': user.email,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastLogin': FieldValue.serverTimestamp(),
+          'isAdmin': false,
+          'isContributor': false,
+          'isInvestor': false,
+          'isCustomer': true,
+          'userType': 'customer',
+        });
+      } else {
+        // Update last login timestamp
+        await userDoc.update({'lastLogin': FieldValue.serverTimestamp()});
+      }
+    } catch (e) {
+      debugPrint("Error updating user roles: $e");
+    }
+  }
+
+  // Sign in with Google
+  Future<User?> signInWithGoogle() async {
+    try {
+      // Begin interactive sign-in process
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
+      if (googleUser == null) {
+        return null; // User canceled the sign-in
+      }
+
+      // Obtain auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Create new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in with credential
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+
       if (user != null) {
         await updateUserRolesAfterLogin(user);
       }
 
       return user;
     } catch (e) {
-      print('Login error: $e');
+      debugPrint("Google sign in error: $e");
       rethrow;
     }
   }
 
-  // Register with Email/Password
-  Future<User?> register(String email, String password) async {
-    try {
-      // Create the user in Firebase Auth
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      User? user = result.user;
-
-      // Create a basic user document in Firestore
-      if (user != null) {
-        await _firestore.collection('users').doc(user.uid).set({
-          'email': email,
-          'isAdmin': false,
-          'isContributor': false,
-          'isInvestor': false,
-          'isCustomer': true,
-          'userType': 'customer',
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-      }
-
-      return user;
-    } catch (e) {
-      print("Registration error: $e");
-      rethrow;
-    }
-  }
-
-  // Google Sign-In
-  Future<User?> signInWithGoogle() async {
-    try {
-      // Trigger the authentication flow
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-
-      if (googleUser == null) return null;
-
-      // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // Sign in to Firebase with the credential
-      final UserCredential userCredential = await _auth.signInWithCredential(
-        credential,
-      );
-      final User? user = userCredential.user;
-
-      // If user doesn't exist in Firestore yet, create their document
-      if (user != null) {
-        final docSnapshot =
-            await _firestore.collection('users').doc(user.uid).get();
-
-        if (!docSnapshot.exists) {
-          await _firestore.collection('users').doc(user.uid).set({
-            'email': user.email,
-            'displayName': user.displayName,
-            'firstName': user.displayName?.split(' ').first ?? '',
-            'lastName': user.displayName?.split(' ').last ?? '',
-            'isAdmin': false,
-            'isContributor': false,
-            'isInvestor': false,
-            'isCustomer': true,
-            'userType': 'customer',
-            'createdAt': FieldValue.serverTimestamp(),
-            'lastLogin': FieldValue.serverTimestamp(),
-          });
-        } else {
-          await _firestore.collection('users').doc(user.uid).update({
-            'lastLogin': FieldValue.serverTimestamp(),
-          });
-        }
-      }
-
-      return user;
-    } catch (e) {
-      print("Google sign-in error: $e");
-      rethrow;
-    }
-  }
-
-  // Apple Sign-In
+  // Sign in with Apple
   Future<User?> signInWithApple() async {
     try {
-      // Check if Apple Sign In is available on this device
-      final isAvailable = await SignInWithApple.isAvailable();
+      // Generate random string to secure the request
+      final rawNonce = _generateNonce();
+      final nonce = _sha256ofString(rawNonce);
 
-      if (!isAvailable) {
-        throw Exception('Apple Sign In is not available on this device');
-      }
-
-      // Request credential for the sign in
+      // Request credentials for the sign-in
       final appleCredential = await SignInWithApple.getAppleIDCredential(
         scopes: [
           AppleIDAuthorizationScopes.email,
           AppleIDAuthorizationScopes.fullName,
         ],
+        nonce: nonce,
       );
 
-      // Create OAuthCredential for Firebase
-      final oauthCredential = OAuthProvider('apple.com').credential(
-        idToken: appleCredential.identityToken,
-        accessToken: appleCredential.authorizationCode,
-      );
+      // Create OAuthCredential
+      final oauthCredential = OAuthProvider(
+        "apple.com",
+      ).credential(idToken: appleCredential.identityToken, rawNonce: rawNonce);
 
-      // Sign in with the credential
+      // Sign in with credential
       final userCredential = await _auth.signInWithCredential(oauthCredential);
-      final User? user = userCredential.user;
+      final user = userCredential.user;
 
-      // Update user information in Firestore
       if (user != null) {
-        final docSnapshot =
-            await _firestore.collection('users').doc(user.uid).get();
-
-        // Prepare the user data
-        final Map<String, dynamic> userData = {
-          'email': user.email,
-          'lastLogin': FieldValue.serverTimestamp(),
-        };
-
-        // Add first and last name if available from Apple
-        if (appleCredential.givenName != null) {
-          userData['firstName'] = appleCredential.givenName;
-        }
-
-        if (appleCredential.familyName != null) {
-          userData['lastName'] = appleCredential.familyName;
-        }
-
-        // Add display name if both names are available
-        if (appleCredential.givenName != null &&
-            appleCredential.familyName != null) {
-          userData['displayName'] =
-              '${appleCredential.givenName} ${appleCredential.familyName}';
-        }
-
-        if (!docSnapshot.exists) {
-          // Create new user document
-          userData['isAdmin'] = false;
-          userData['isContributor'] = false;
-          userData['isInvestor'] = false;
-          userData['isCustomer'] = true;
-          userData['userType'] = 'customer';
-          userData['createdAt'] = FieldValue.serverTimestamp();
-
-          await _firestore.collection('users').doc(user.uid).set(userData);
-        } else {
-          // Update existing document
-          await _firestore.collection('users').doc(user.uid).update(userData);
-        }
+        await updateUserRolesAfterLogin(user);
       }
 
       return user;
     } catch (e) {
-      print("Error during Apple sign-in: $e");
+      debugPrint("Apple sign in error: $e");
       rethrow;
     }
   }
 
+  // Helper for Apple Sign In
+  String _generateNonce([int length = 32]) {
+    const charset =
+        '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(
+      length,
+      (_) => charset[random.nextInt(charset.length)],
+    ).join();
+  }
+
+  String _sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
   // Sign out
   Future<void> signOut() async {
-    await GoogleSignIn().signOut();
+    await _googleSignIn.signOut();
     return await _auth.signOut();
   }
 
@@ -310,38 +318,5 @@ class AuthService {
           : 'customer';
     }
     return 'customer';
-  }
-
-  // Add this method to update user roles when they log in
-  Future<void> updateUserRolesAfterLogin(User user) async {
-    try {
-      // Get the user document
-      DocumentSnapshot userDoc =
-          await _firestore.collection('users').doc(user.uid).get();
-
-      // If no document exists, create default one
-      if (!userDoc.exists) {
-        await _firestore.collection('users').doc(user.uid).set({
-          'email': user.email,
-          'displayName': user.displayName,
-          'firstName': user.displayName?.split(' ').first ?? '',
-          'lastName': user.displayName?.split(' ').last ?? '',
-          'isAdmin': false,
-          'isContributor': false,
-          'isInvestor': false,
-          'isCustomer': true,
-          'userType': 'customer',
-          'createdAt': FieldValue.serverTimestamp(),
-          'lastLogin': FieldValue.serverTimestamp(),
-        });
-      } else {
-        // Just update last login
-        await _firestore.collection('users').doc(user.uid).update({
-          'lastLogin': FieldValue.serverTimestamp(),
-        });
-      }
-    } catch (e) {
-      print('Error updating user roles: $e');
-    }
   }
 }

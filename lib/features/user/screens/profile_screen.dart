@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:neusenews/features/user/screens/edit_profile_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:neusenews/providers/auth_provider.dart' as app_auth;
+import 'package:neusenews/constants/app_colors.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -55,7 +56,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     width: 120,
                     height: 120,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFd2982a).withOpacity(0.2),
+                      color: AppColors.primary.withAlpha(51),
                       shape: BoxShape.circle,
                     ),
                     child: Center(
@@ -65,7 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         style: const TextStyle(
                           fontSize: 48,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFFd2982a),
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -148,22 +149,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Edit Profile Button
             ElevatedButton.icon(
               onPressed: () {
+                // Navigate to edit profile without parameters
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder:
-                        (context) => EditProfileScreen(
-                          firstName: firstName,
-                          lastName: lastName,
-                          email: email,
-                          phone: phone,
-                          zipCode: zipCode,
-                          birthday: birthday,
-                          textAlerts: textAlerts,
-                          dailyDigest: dailyDigest,
-                          sportsNewsletter: sportsNewsletter,
-                          politicalNewsletter: politicalNewsletter,
-                        ),
+                    builder: (context) => const EditProfileScreen(),
                   ),
                 ).then((_) {
                   // Refresh user data when returning from edit profile
@@ -174,7 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               label: const Text('Edit Profile'),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 50),
-                backgroundColor: const Color(0xFFd2982a),
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
               ),
             ),

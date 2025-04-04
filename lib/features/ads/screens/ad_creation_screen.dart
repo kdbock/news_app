@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neusenews/models/ad.dart';
 import 'package:neusenews/features/ads/screens/ad_checkout_screen.dart';
+import 'package:neusenews/services/ad_service.dart';
 
 class AdCreationScreen extends StatefulWidget {
   final AdType? initialAdType;
@@ -80,12 +81,45 @@ class _AdCreationScreenState extends State<AdCreationScreen> {
   }
 
   Future<void> _pickImage() async {
-    final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800, // Optimize image size
+        maxHeight: 800,
+        imageQuality: 85, // Better balance of quality and size
+      );
 
-    if (pickedFile != null) {
-      setState(() {
-        _imageFile = File(pickedFile.path);
-      });
+      if (pickedFile != null) {
+        final File file = File(pickedFile.path);
+
+        // Check file size (limit to 5MB)
+        final int fileSize = await file.length();
+        if (fileSize > 5 * 1024 * 1024) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Image too large. Please select an image smaller than 5MB',
+                ),
+              ),
+            );
+          }
+          return;
+        }
+
+        setState(() {
+          _imageFile = file;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error selecting image. Please try again.'),
+          ),
+        );
+      }
     }
   }
 
@@ -121,49 +155,115 @@ class _AdCreationScreenState extends State<AdCreationScreen> {
     }
   }
 
-  void _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      if (_imageFile == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select an image for your ad')),
-        );
-        return;
-      }
+  bool _containsProhibitedContent(String text) {
+    final prohibitedTerms = [
+      'gambling',
+      'casino',
+      'lottery',
+      'bet',
+      'alcohol',
+      'tobacco',
+      'vape',
+      'cigarette',
+      'dating',
+      'adult',
+      'xxx',
+      'prescription',
+    ];
 
-      // Get current user ID
-      final String? businessId = FirebaseAuth.instance.currentUser?.uid;
+    final lowerText = text.toLowerCase();
+    return prohibitedTerms.any((term) => lowerText.contains(term));
+  }
 
-      if (businessId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to create an ad')),
-        );
-        return;
-      }
+  void _validateAdContent() {
+    final headline = _headlineController.text;
+    final description = _descriptionController.text;
+    final link = _linkController.text;
 
-      // Create ad object
-      final Ad newAd = Ad(
-        businessId: businessId,
-        businessName: _businessNameController.text,
-        headline: _headlineController.text,
-        description: _descriptionController.text,
-        imageUrl: '', // Will be populated by AdService
-        linkUrl: _linkController.text,
-        type: _selectedAdType,
-        status: AdStatus.pending,
-        startDate: _startDate!,
-        endDate: _endDate!,
-        cost: _adCost,
-      );
-
-      // Navigate to checkout screen
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => AdCheckoutScreen(ad: newAd, imageFile: _imageFile!),
+    if (_containsProhibitedContent(headline) ||
+        _containsProhibitedContent(description) ||
+        _containsProhibitedContent(link)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Your ad contains prohibited content. Please review our content policy.',
+          ),
+          backgroundColor: Colors.red,
         ),
       );
+      return;
     }
+
+    // Continue with form submission
+    _submitForm();
+  }
+
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    // Validate URL safety
+    final AdService adService = AdService();
+    final sanitizedUrl = adService.sanitizeUrl(_linkController.text);
+
+    // Check for prohibited content
+    if (_containsProhibitedContent(_headlineController.text) ||
+        _containsProhibitedContent(_descriptionController.text) ||
+        _containsProhibitedContent(sanitizedUrl)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Your ad contains prohibited content. Please review our content policy.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (_imageFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select an image for your ad')),
+      );
+      return;
+    }
+
+    // Get current user ID
+    final String? businessId = FirebaseAuth.instance.currentUser?.uid;
+
+    if (businessId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to create an ad')),
+      );
+      return;
+    }
+
+    // Create ad object
+    final Ad newAd = Ad(
+      businessId: businessId,
+      businessName: _businessNameController.text,
+      headline: _headlineController.text,
+      description: _descriptionController.text,
+      linkUrl: sanitizedUrl, // Use sanitized URL instead of raw input
+      imageUrl: '', // Will be populated by AdService
+      type: _selectedAdType,
+      startDate: _startDate!,
+      endDate: _endDate!,
+      isActive: false,
+      status: 'pending',
+      cost: _adCost, // Include the calculated cost
+      impressions: 0,
+      clicks: 0,
+      ctr: 0.0,
+    );
+
+    // Navigate to checkout screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (context) => AdCheckoutScreen(ad: newAd, imageFile: _imageFile!),
+      ),
+    );
   }
 
   @override
@@ -461,7 +561,7 @@ class _AdCreationScreenState extends State<AdCreationScreen> {
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: _submitForm,
+                  onPressed: _validateAdContent,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFd2982a),
                   ),

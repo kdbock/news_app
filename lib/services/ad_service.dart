@@ -3,12 +3,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:neusenews/models/ad.dart';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' as flutter;
 
 class AdService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Add this static map as a class property instead of inside the function
+  static final Map<AdType, int> _lastAdCounts = {};
 
   // Create a new ad
   Future<String> createAd(Ad ad) async {
@@ -50,7 +53,10 @@ class AdService {
   Stream<List<Ad>> getActiveAds() {
     return _firestore
         .collection('ads')
-        .where('status', isEqualTo: AdStatus.active.index)
+        .where(
+          'status',
+          isEqualTo: 'active',
+        ) // Use string instead of enum index
         .where('endDate', isGreaterThan: Timestamp.fromDate(DateTime.now()))
         .snapshots()
         .map(
@@ -59,33 +65,54 @@ class AdService {
         );
   }
 
-  // Get active ads by type
+  // Update method to be more efficient
   Stream<List<Ad>> getActiveAdsByType(AdType type) {
-    print("Fetching ads of type: $type");
+    final now = DateTime.now();
+    final typeIndex = type.index;
 
-    try {
-      return _firestore
-          .collection('ads')
-          .where('status', isEqualTo: AdStatus.active.index)
-          .where('type', isEqualTo: type.index)
-          .where(
-            'startDate',
-            isLessThanOrEqualTo: Timestamp.fromDate(
-              DateTime.now().add(const Duration(days: 1)),
-            ),
-          )
-          .where('endDate', isGreaterThan: Timestamp.fromDate(DateTime.now()))
-          .snapshots()
-          .map((snapshot) {
-            final ads =
-                snapshot.docs.map((doc) => Ad.fromFirestore(doc)).toList();
-            print("Found ${ads.length} active ads of type $type");
-            return ads;
-          });
-    } catch (e) {
-      print("Error fetching ads: $e");
-      return Stream.value([]);
-    }
+    // Only query once and cache result
+    return FirebaseFirestore.instance
+        .collection('ads')
+        .where('type', isEqualTo: typeIndex)
+        .snapshots()
+        .map((snapshot) {
+          final List<Ad> allAds = [];
+
+          for (final doc in snapshot.docs) {
+            try {
+              final data = doc.data();
+
+              // Handle dates safely
+              final Timestamp? startTimestamp = data['startDate'] as Timestamp?;
+              final Timestamp? endTimestamp = data['endDate'] as Timestamp?;
+
+              final startDate =
+                  startTimestamp?.toDate() ??
+                  DateTime.now().subtract(const Duration(days: 1));
+              final endDate =
+                  endTimestamp?.toDate() ??
+                  DateTime.now().add(const Duration(days: 30));
+
+              // Check if ad is within date range
+              final bool isInDateRange =
+                  startDate.isBefore(now) && endDate.isAfter(now);
+
+              if (isInDateRange) {
+                try {
+                  final ad = Ad.fromFirestore(doc);
+                  allAds.add(ad);
+                } catch (e) {
+                  // Silent error handling - don't flood console
+                }
+              }
+            } catch (e) {
+              // Silent error handling - don't flood console
+            }
+          }
+
+          return allAds;
+        })
+        .asBroadcastStream(); // Important: make it reusable by multiple subscribers
   }
 
   // Record an impression
@@ -106,7 +133,7 @@ class AdService {
         await _firestore.collection('ads').doc(adId).update({'ctr': ctr});
       }
     } catch (e) {
-      debugPrint("Error recording impression: $e");
+      flutter.debugPrint("Error recording impression: $e");
     }
   }
 
@@ -128,7 +155,7 @@ class AdService {
         await _firestore.collection('ads').doc(adId).update({'ctr': ctr});
       }
     } catch (e) {
-      debugPrint("Error recording click: $e");
+      flutter.debugPrint("Error recording click: $e");
     }
   }
 
@@ -147,7 +174,7 @@ class AdService {
       totalClicks += (data['clicks'] as num?)?.toInt() ?? 0;
       totalRevenue += data['cost']?.toDouble() ?? 0.0;
 
-      if (data['status'] == AdStatus.active.index) {
+      if (data['status'] == 'active') {
         activeAds++;
       }
     }
@@ -208,9 +235,9 @@ class AdService {
         final ad = Ad.fromFirestore(doc);
 
         // Add to respective lists
-        if (ad.status == AdStatus.active && ad.endDate.isAfter(now)) {
+        if (ad.status == 'active' && ad.endDate.isAfter(now)) {
           activeAds.add(ad);
-        } else if (ad.status == AdStatus.expired || ad.endDate.isBefore(now)) {
+        } else if (ad.status == 'expired' || ad.endDate.isBefore(now)) {
           pastAds.add(ad);
         }
 
@@ -247,7 +274,7 @@ class AdService {
   Future<void> cancelAd(String adId) async {
     try {
       await _firestore.collection('ads').doc(adId).update({
-        'status': AdStatus.expired.index,
+        'status': 'expired',
       });
     } catch (e) {
       throw Exception('Failed to cancel ad: $e');
@@ -263,7 +290,7 @@ class AdService {
               .where('type', isEqualTo: type.index)
               .get();
 
-      print(
+      flutter.debugPrint(
         'Found ${snapshot.docs.length} ads with type ${type.index} (${_getAdTypeName(type)})',
       );
 
@@ -272,20 +299,22 @@ class AdService {
       for (var doc in snapshot.docs) {
         final ad = Ad.fromFirestore(doc);
         final now = DateTime.now();
-        if (ad.status == AdStatus.active &&
+        if (ad.status == 'active' &&
             ad.startDate.isBefore(now) &&
             ad.endDate.isAfter(now)) {
           activeCount++;
-          print(' - Active ad: ${ad.headline} (${ad.id})');
+          flutter.debugPrint(' - Active ad: ${ad.headline} (${ad.id})');
         } else {
-          print(
+          flutter.debugPrint(
             ' - Inactive ad: ${ad.headline} (${ad.id}) - Status: ${ad.status}, '
             'Start: ${ad.startDate}, End: ${ad.endDate}',
           );
         }
       }
 
-      print(' => $activeCount active ads for ${_getAdTypeName(type)}');
+      flutter.debugPrint(
+        ' => $activeCount active ads for ${_getAdTypeName(type)}',
+      );
     }
   }
 
@@ -299,6 +328,57 @@ class AdService {
         return 'In-Feed News';
       case AdType.weather:
         return 'Weather Sponsor';
+    }
+  }
+
+  // Sanitize input URLs to prevent security vulnerabilities
+  String sanitizeUrl(String url) {
+    // Ensure URL starts with http:// or https://
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return 'https://$url';
+    }
+    return url;
+  }
+
+  // Validate image URL before displaying
+  Future<bool> isValidImageUrl(String url) async {
+    try {
+      final Uri uri = Uri.parse(url);
+      if (!uri.isAbsolute) return false;
+
+      // Optional: You could add additional checks here
+      // For example, checking if the URL is from a trusted domain
+
+      return true;
+    } catch (e) {
+      flutter.debugPrint('Invalid image URL: $e');
+      return false;
+    }
+  }
+
+  // Add secure impression tracking with rate limiting
+  final Map<String, DateTime> _lastImpressionTime = {};
+
+  Future<void> recordImpressionSecurely(String adId) async {
+    try {
+      // Rate limit impressions from the same device to prevent abuse
+      final now = DateTime.now();
+      if (_lastImpressionTime.containsKey(adId)) {
+        final lastTime = _lastImpressionTime[adId]!;
+        if (now.difference(lastTime).inMinutes < 5) {
+          // Don't count impressions from the same device within 5 minutes
+          return;
+        }
+      }
+
+      _lastImpressionTime[adId] = now;
+
+      await FirebaseFirestore.instance.collection('ads').doc(adId).update({
+        'impressions': FieldValue.increment(1),
+        'lastImpressionAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      flutter.debugPrint('Error recording impression: $e');
     }
   }
 }

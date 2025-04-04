@@ -56,9 +56,17 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.YOUR-CLIENT-ID</string>
+				<string>com.googleusercontent.apps.236600949564-YOUR_IOS_CLIENT_ID</string>
 			</array>
 		</dict>
+	</array>
+	<key>GIDClientID</key>
+	<string>236600949564-YOUR_IOS_CLIENT_ID.apps.googleusercontent.com</string>
+
+	<!-- For Apple Sign In -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
 	</array>
 </dict>
 </plist>

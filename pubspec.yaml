@@ -9,9 +9,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^3.13.0
-  firebase_auth: ^5.5.2
-  cloud_firestore: ^5.6.6
+  # Use consistent Firebase versions
+  firebase_core: ^2.15.1
+  firebase_auth: ^4.9.0
+  firebase_storage: ^11.2.6
+  cloud_firestore: ^4.9.1
+  cloud_functions: ^4.4.0  # Update to match other Firebase plugins
   provider: ^6.0.5
   google_sign_in: ^6.1.5           # Google Auth
   # sign_in_with_apple: ^4.3.0       # Temporarily comment this out
@@ -24,7 +27,6 @@ dependencies:
   cupertino_icons: ^1.0.8          # iOS-style icons
   share_plus: ^10.1.4  # Try a slightly older version if ^7.2.1 is causing issues
   webview_flutter: ^4.4.2          # Update to the latest version instead of 3.0.4
-  firebase_storage: ^12.4.4
   image_picker: ^1.0.4
   # file_picker: ^5.3.3
   path_provider: ^2.1.1
@@ -35,10 +37,14 @@ dependencies:
   # flutter_stripe: ^11.0.0         # Add these to your existing dependencies
   # flutter_credit_card: ^4.0.1
   # Add these dependencies
-  cloud_functions: ^5.3.4
   fl_chart: ^0.70.2 # Use the latest version
   transparent_image: ^2.0.1
   sign_in_with_apple: ^6.1.4
+  visibility_detector: ^0.4.0+2
+  connectivity_plus: ^5.0.2
+  firebase_analytics: ^10.7.4
+  geolocator: ^10.0.0
+  geocoding: ^2.1.1
 
 dev_dependencies:
   flutter_test:

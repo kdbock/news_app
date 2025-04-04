@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:neusenews/models/ad.dart';
 import 'package:neusenews/services/ad_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class TitleSponsorBanner extends StatefulWidget {
   const TitleSponsorBanner({super.key});
@@ -12,23 +13,72 @@ class TitleSponsorBanner extends StatefulWidget {
 
 class _TitleSponsorBannerState extends State<TitleSponsorBanner> {
   final AdService _adService = AdService();
+  // Cache the stream and use distinct to prevent excessive rebuilds
+  late final Stream<List<Ad>> _adsStream;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Create a cached stream with distinct() to prevent duplicate emissions
+    _adsStream = _adService.getActiveAdsByType(AdType.titleSponsor).distinct((
+      previous,
+      next,
+    ) {
+      // Only emit if the lists are different
+      if (previous.length != next.length) return false;
+      // Compare ad IDs to see if the list has changed
+      for (int i = 0; i < previous.length; i++) {
+        if (previous[i].id != next[i].id) return false;
+      }
+      return true;
+    });
+
+    // Log only once during initialization
+    debugPrint('Title sponsor banner initialized');
+  }
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Ad>>(
-      stream: _adService.getActiveAdsByType(AdType.titleSponsor),
+      stream: _adsStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        // Only log state changes, not every rebuild
+        if (snapshot.connectionState == ConnectionState.active &&
+            snapshot.data == null) {
+          debugPrint('Title Sponsor - No ads available');
+        }
+
+        if (snapshot.hasError) {
+          debugPrint('Title Sponsor Error: ${snapshot.error}');
           return const SizedBox(height: 0);
         }
 
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            height: 60,
+            margin: const EdgeInsets.symmetric(vertical: 4.0),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const SizedBox(height: 0);
         }
 
         // Get a random ad from the available ones
         final ads = snapshot.data!;
-        final ad = ads[DateTime.now().millisecond % ads.length];
+        final ad = ads.first;
 
         // Record impression
         _adService.recordImpression(ad.id!);
@@ -37,17 +87,18 @@ class _TitleSponsorBannerState extends State<TitleSponsorBanner> {
           margin: const EdgeInsets.symmetric(vertical: 4.0),
           child: GestureDetector(
             onTap: () async {
-              // Record click
               await _adService.recordClick(ad.id!);
-
-              // Open link
               final Uri url = Uri.parse(ad.linkUrl);
               if (await canLaunchUrl(url)) {
-                await launchUrl(url);
+                await launchUrl(url, mode: LaunchMode.externalApplication);
               }
             },
             child: Card(
+              elevation: 2,
               margin: EdgeInsets.zero,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -59,11 +110,11 @@ class _TitleSponsorBannerState extends State<TitleSponsorBanner> {
                     color: Colors.grey[200],
                     child: Row(
                       children: [
-                        const Text(
-                          'TITLE SPONSOR',
+                        Text(
+                          'SPONSOR',
                           style: TextStyle(
                             fontSize: 10.0,
-                            color: Colors.grey,
+                            color: Theme.of(context).primaryColor,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -78,12 +129,39 @@ class _TitleSponsorBannerState extends State<TitleSponsorBanner> {
                       ],
                     ),
                   ),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Padding(
-                          padding: const EdgeInsets.all(12.0),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Row(
+                      children: [
+                        // Ad image
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4.0),
+                          child: CachedNetworkImage(
+                            imageUrl: ad.imageUrl,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            placeholder:
+                                (context, url) => Container(
+                                  width: 60,
+                                  height: 60,
+                                  color: Colors.grey[200],
+                                  child: const Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                ),
+                            errorWidget:
+                                (context, url, error) => Container(
+                                  width: 60,
+                                  height: 60,
+                                  color: Colors.grey[200],
+                                  child: const Icon(Icons.image),
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Ad text content
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -91,43 +169,21 @@ class _TitleSponsorBannerState extends State<TitleSponsorBanner> {
                                 ad.headline,
                                 style: const TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16.0,
+                                  fontSize: 14,
                                 ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 6.0),
+                              const SizedBox(height: 2),
                               Text(
                                 ad.description,
-                                style: const TextStyle(fontSize: 14.0),
+                                style: const TextStyle(fontSize: 12),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
                         ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.only(
-                            topRight: Radius.circular(4.0),
-                            bottomRight: Radius.circular(4.0),
-                          ),
-                          child: Image.network(
-                            ad.imageUrl,
-                            height: 100,
-                            fit: BoxFit.cover,
-                            errorBuilder:
-                                (context, error, stackTrace) => Container(
-                                  height: 100,
-                                  color: Colors.grey[300],
-                                  child: const Icon(Icons.image, size: 40),
-                                ),
-                          ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),

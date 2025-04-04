@@ -1,116 +1,116 @@
-import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class AuthProvider extends ChangeNotifier {
+class AuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   User? _user;
   Map<String, dynamic>? _userData;
   bool _isLoading = false;
 
   AuthProvider() {
-    // Listen to auth state changes
-    _auth.authStateChanges().listen((User? user) {
-      _user = user;
-      if (user != null) {
-        // When user logs in, fetch their data from Firestore
-        _fetchUserData();
-      } else {
-        // When user logs out, clear their data
-        _userData = null;
-      }
-      notifyListeners();
-    });
+    _initAuthListener();
   }
 
+  // Getters
   User? get user => _user;
   Map<String, dynamic>? get userData => _userData;
   bool get isLoading => _isLoading;
+  bool get isLoggedIn => _user != null;
+  bool get isAdmin => _userData?['isAdmin'] == true;
+  bool get isContributor => _userData?['isContributor'] == true;
+  bool get isInvestor => _userData?['isInvestor'] == true;
+  bool get isAdvertiser => _userData?['isAdvertiser'] == true;
 
-  // Add a method to get user roles
-  bool get isAdmin => _userData?['isAdmin'] ?? false;
-  bool get isContributor => _userData?['isContributor'] ?? false;
-  bool get isInvestor => _userData?['isInvestor'] ?? false;
-  String get userType => _userData?['userType'] ?? 'customer';
+  // Initialize Firebase Auth listener
+  void _initAuthListener() {
+    _auth.authStateChanges().listen((User? user) async {
+      _user = user;
+
+      if (user != null) {
+        try {
+          await _fetchUserData();
+        } catch (e) {
+          debugPrint('Error fetching user data: $e');
+        }
+      } else {
+        _userData = null;
+      }
+
+      notifyListeners();
+    });
+  }
 
   // Fetch user data from Firestore
   Future<void> _fetchUserData() async {
     if (_user == null) return;
 
-    _isLoading = true;
-    notifyListeners();
-
     try {
-      final docSnapshot =
+      _isLoading = true;
+      notifyListeners();
+
+      final snapshot =
           await _firestore.collection('users').doc(_user!.uid).get();
 
-      if (docSnapshot.exists) {
-        _userData = docSnapshot.data();
+      if (snapshot.exists) {
+        _userData = snapshot.data();
         debugPrint('User data fetched: $_userData');
       } else {
-        // Create a new user document if it doesn't exist
-        final newUserData = {
-          'email': _user!.email,
-          'displayName': _user!.displayName ?? _user!.email?.split('@')[0],
-          'firstName': _user!.displayName?.split(' ')[0] ?? '',
-          'lastName': (_user!.displayName != null && _user!.displayName!.split(' ').length > 1)
-              ? _user!.displayName!.split(' ')[1]
-              : '',
-          'photoURL': _user!.photoURL,
-          'isAdmin': false,
-          'isContributor': false,
-          'isInvestor': false,
-          'isCustomer': true,
-          'userType': 'customer',
-          'createdAt': FieldValue.serverTimestamp(),
-          'lastLogin': FieldValue.serverTimestamp(),
-        };
-
-        await _firestore.collection('users').doc(_user!.uid).set(newUserData);
-        _userData = newUserData;
-        debugPrint('New user created: $_userData');
+        debugPrint('User document does not exist in Firestore');
       }
     } catch (e) {
       debugPrint('Error fetching user data: $e');
+      _userData = null;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Manual refresh of user data
+  // Add refreshUserData method to fix errors
   Future<void> refreshUserData() async {
-    await _fetchUserData();
+    try {
+      await _fetchUserData();
+      debugPrint('User data refreshed successfully');
+    } catch (e) {
+      debugPrint('Error refreshing user data: $e');
+    }
   }
 
-  // Sign in with email and password
-  Future<void> signInWithEmailAndPassword(String email, String password) async {
-    _isLoading = true;
-    notifyListeners();
-
+  // Login method
+  Future<User?> login(String email, String password) async {
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      _isLoading = true;
+      notifyListeners();
 
-      // Update last login
-      if (_user != null) {
-        await _firestore.collection('users').doc(_user!.uid).update({
-          'lastLogin': FieldValue.serverTimestamp(),
-        });
-      }
+      final userCredential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return userCredential.user;
+    } catch (e) {
+      debugPrint('Login error: $e');
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Sign out
+  // Rename to signOut to match usage in app_drawer.dart
   Future<void> signOut() async {
-    _isLoading = true;
-    notifyListeners();
-
     try {
+      _isLoading = true;
+      notifyListeners();
+
       await _auth.signOut();
+      _userData = null;
+    } catch (e) {
+      debugPrint('Logout error: $e');
+      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();

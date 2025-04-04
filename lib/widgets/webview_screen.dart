@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class WebViewScreen extends StatefulWidget {
   final String url;
@@ -12,45 +13,46 @@ class WebViewScreen extends StatefulWidget {
 }
 
 class _WebViewScreenState extends State<WebViewScreen> {
-  late final WebViewController _controller;
+  late WebViewController _controller;
   bool _isLoading = true;
-  double _loadingProgress = 0;
+  final bool _readerModeEnabled = false;
 
   @override
   void initState() {
     super.initState();
-
-    // Initialize WebViewController
     _controller =
         WebViewController()
           ..setJavaScriptMode(JavaScriptMode.unrestricted)
           ..setNavigationDelegate(
             NavigationDelegate(
-              onProgress: (progress) {
-                setState(() {
-                  _loadingProgress = progress / 100;
-                  if (progress == 100) {
-                    _isLoading = false;
-                  }
-                });
-              },
               onPageStarted: (String url) {
-                setState(() {
-                  _isLoading = true;
-                });
+                setState(() => _isLoading = true);
               },
               onPageFinished: (String url) {
-                setState(() {
-                  _isLoading = false;
-                });
-              },
-              onNavigationRequest: (NavigationRequest request) {
-                // You can intercept certain URLs if needed
-                return NavigationDecision.navigate;
+                setState(() => _isLoading = false);
+                // Inject CSS to hide Google ads
+                _controller.runJavaScript('''
+          document.querySelectorAll('.adsbygoogle').forEach(function(ad) {
+            ad.style.display = 'none';
+          });
+        ''');
+                // Add reader mode injection for better reading experience
+                if (_readerModeEnabled) {
+                  _injectReaderMode();
+                }
               },
             ),
           )
           ..loadRequest(Uri.parse(widget.url));
+  }
+
+  void _injectReaderMode() {
+    _controller.runJavaScript('''
+      document.body.style.fontSize = '18px';
+      document.body.style.lineHeight = '1.6';
+      document.body.style.margin = '0 auto';
+      document.body.style.maxWidth = '800px';
+    ''');
   }
 
   @override
@@ -58,51 +60,35 @@ class _WebViewScreenState extends State<WebViewScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF2d2c31),
-        elevation: 1,
+        backgroundColor: const Color(0xFFd2982a),
         actions: [
-          // Reload button
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              _controller.reload();
-            },
-          ),
-          // Back button for web navigation
-          IconButton(
-            icon: const Icon(Icons.arrow_back_ios),
+            icon: const Icon(Icons.open_in_browser),
             onPressed: () async {
-              if (await _controller.canGoBack()) {
-                _controller.goBack();
-              }
-            },
-          ),
-          // Forward button for web navigation
-          IconButton(
-            icon: const Icon(Icons.arrow_forward_ios),
-            onPressed: () async {
-              if (await _controller.canGoForward()) {
-                _controller.goForward();
+              final url = Uri.parse(widget.url);
+              final currentContext = context;
+              final state = mounted;
+
+              try {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              } catch (e) {
+                if (state) {
+                  ScaffoldMessenger.of(currentContext).showSnackBar(
+                    SnackBar(content: Text('Could not open $url')),
+                  );
+                }
               }
             },
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          // Loading indicator
+          WebViewWidget(controller: _controller),
           if (_isLoading)
-            LinearProgressIndicator(
-              value: _loadingProgress,
-              backgroundColor: Colors.grey[200],
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFFd2982a),
-              ),
+            const Center(
+              child: CircularProgressIndicator(color: Color(0xFFd2982a)),
             ),
-
-          // WebView - use WebViewWidget instead of WebView
-          Expanded(child: WebViewWidget(controller: _controller)),
         ],
       ),
     );

@@ -172,6 +172,30 @@ class AppDrawer extends StatelessWidget {
                 Navigator.pushNamed(context, '/admin-dashboard');
               },
             ),
+            ListTile(
+              leading: const Icon(Icons.article, color: Color(0xFF2d2c31)),
+              title: const Text('Review Content'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/review-sponsored-content');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.ads_click, color: Color(0xFF2d2c31)),
+              title: const Text('Review Ads'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/review-ads');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.people, color: Color(0xFF2d2c31)),
+              title: const Text('User Management'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/admin-users');
+              },
+            ),
           ],
 
           // Contributor section
@@ -224,6 +248,38 @@ class AppDrawer extends StatelessWidget {
             ),
           ],
 
+          // Advertiser section
+          if (authProvider.isAdvertiser) ...[
+            const Divider(),
+            const Padding(
+              padding: EdgeInsets.only(left: 16.0, top: 8.0),
+              child: Text(
+                'ADVERTISER',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.analytics, color: Color(0xFF2d2c31)),
+              title: const Text('Advertiser Dashboard'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/advertiser-dashboard');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_business, color: Color(0xFF2d2c31)),
+              title: const Text('Create New Ad'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/create-ad');
+              },
+            ),
+          ],
+
           // Authenticated user options
           if (user != null) ...[
             const Divider(),
@@ -235,7 +291,14 @@ class AppDrawer extends StatelessWidget {
                 Navigator.pushNamed(context, '/profile');
               },
             ),
-
+            ListTile(
+              leading: const Icon(Icons.edit, color: Color(0xFF2d2c31)),
+              title: const Text('Edit Profile'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/edit-profile');
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.settings, color: Color(0xFF2d2c31)),
               title: const Text('Settings'),
@@ -244,7 +307,6 @@ class AppDrawer extends StatelessWidget {
                 Navigator.pushNamed(context, '/settings');
               },
             ),
-
             ListTile(
               leading: const Icon(Icons.logout, color: Color(0xFF2d2c31)),
               title: const Text('Logout'),
@@ -266,7 +328,6 @@ class AppDrawer extends StatelessWidget {
                 Navigator.pushNamed(context, '/login');
               },
             ),
-
             ListTile(
               leading: const Icon(Icons.person_add, color: Color(0xFF2d2c31)),
               title: const Text('Register'),

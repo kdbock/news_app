@@ -1,38 +1,69 @@
 import 'package:intl/intl.dart';
 
 class Article {
-  final String id;
+  final String? id;
+  final String? guid;
   final String title;
-  final String author;
-  final DateTime publishDate;
+  final String description;
+  final String url;
   final String imageUrl;
-  final String url; // renamed from 'link' for clarity
-  final String content; // full content (for sponsored articles)
-  final String excerpt; // short description (used for previews)
-  final List<String> categories;
-  final bool isSponsored; // flag for sponsored content
-  final String linkText; // custom text for CTA button
-  final String
-  source; // source name (e.g., company name for sponsored articles)
-
-  // Add a getter for backward compatibility
-  String get link =>
-      url; // This ensures old code using article.link still works
+  final DateTime publishDate;
+  final String? category;
+  final String? author;
+  final String? excerpt;
+  final String? content;
+  final String? linkText;
+  final bool isSponsored;
+  final String? source;
 
   Article({
-    this.id = '',
+    this.id,
+    this.guid,
     required this.title,
-    required this.author,
-    required this.publishDate,
+    required this.description,
+    required this.url,
     required this.imageUrl,
-    this.url = '', // renamed from 'link'
-    this.content = '', // full content
-    this.excerpt = '', // short description
-    this.categories = const [],
+    required this.publishDate,
+    this.category,
+    this.author,
+    this.excerpt,
+    this.content,
+    this.linkText,
     this.isSponsored = false,
-    this.linkText = 'Read More',
-    this.source = '',
+    this.source,
   });
+
+  // Helper method to get unique identifier
+  String get uniqueId => guid ?? id ?? url;
+
+  // Add this computed property for article_detail_screen.dart
+  String get formattedContent {
+    // Use content if available, otherwise use description
+    final textToFormat = content ?? description;
+
+    // Clean up HTML tags if present
+    final withoutHtml = textToFormat.replaceAll(RegExp(r'<[^>]*>'), '');
+
+    // Fix common formatting issues
+    return withoutHtml
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&apos;', "'")
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .trim();
+  }
+
+  // Add this to your Article model
+  String get safeContent {
+    // Remove potentially harmful tags
+    return content?.replaceAll(
+          RegExp(r'<script.*?</script>|<iframe.*?</iframe>'),
+          '',
+        ) ??
+        '';
+  }
 
   // Helper method to parse RSS dates
   static DateTime _parseRssDate(String? dateString) {
@@ -72,46 +103,36 @@ class Article {
       else if (item.enclosure != null && item.enclosure.url != null) {
         imageUrl = item.enclosure.url;
       }
+      // Extract image from description if needed
+      else if (item.description != null) {
+        final imgRegex = RegExp(r'<img[^>]+src="([^">]+)"');
+        final match = imgRegex.firstMatch(item.description);
+        if (match != null && match.groupCount >= 1) {
+          imageUrl = match.group(1) ?? imageUrl;
+        }
+      }
     } catch (e) {
       print('Error extracting image: $e');
     }
 
-    // Clean up description/excerpt by removing HTML tags
-    String excerpt = item.description ?? 'No description available';
-    excerpt = excerpt.replaceAll(RegExp(r'<[^>]*>'), ''); // Remove HTML tags
-
-    // Handle categories safely
-    List<String> categories = [];
-    try {
-      if (item.categories != null) {
-        categories =
-            item.categories.map<String>((cat) {
-              // Handle different RSS feed formats for categories
-              if (cat.value != null) {
-                return cat.value.toString();
-              } else if (cat.domain != null) {
-                return cat.domain.toString();
-              } else if (cat is String) {
-                return cat;
-              }
-              return 'Uncategorized';
-            }).toList();
-      }
-    } catch (e) {
-      print('Error parsing categories: $e');
-    }
+    // Clean up description by removing HTML tags
+    String description = item.description ?? 'No description available';
+    description = description.replaceAll(RegExp(r'<[^>]*>'), '');
 
     return Article(
       title: item.title ?? 'No Title',
-      author: item.dc?.creator ?? 'Unknown',
+      description: description,
       publishDate: _parseRssDate(item.pubDate),
-      excerpt: excerpt,
-      content: excerpt, // For RSS items, content is the same as excerpt
       imageUrl: imageUrl,
       url: item.link ?? '',
-      categories: categories,
-      isSponsored: false, // RSS feeds are not sponsored content
-      source: item.source?.title ?? 'News Feed',
+      guid: item.guid ?? item.link ?? '', // Use link as fallback
+      category: item.categories?.first?.value ?? 'Uncategorized',
+      author: item.author,
+      // Remove excerpt: item.excerpt, line
+      content: item.content?.value, // Use content.value instead
+      linkText: null, // No direct equivalent in RSS
+      isSponsored: false,
+      source: null,
     );
   }
 
@@ -119,71 +140,65 @@ class Article {
   factory Article.fromFirestore(String documentId, Map<String, dynamic> data) {
     return Article(
       id: documentId,
+      guid: data['guid'] ?? data['ctaLink'] ?? '', // Use link as fallback
       title: data['title'] ?? 'No Title',
-      author: data['authorName'] ?? 'Sponsored',
+      description: data['content'] ?? '',
       publishDate: data['publishedAt']?.toDate() ?? DateTime.now(),
       imageUrl: data['headerImageUrl'] ?? 'assets/images/Default.jpeg',
-      content: data['content'] ?? '',
-      excerpt:
-          data['content'] != null && data['content'].length > 150
-              ? '${data['content'].substring(0, 150)}...'
-              : data['content'] ?? '',
       url: data['ctaLink'] ?? '',
-      linkText: data['ctaText'] ?? 'Learn More',
-      isSponsored: true,
-      source: data['companyName'] ?? 'Sponsored Content',
-      categories: data['category'] != null ? [data['category']] : ['Sponsored'],
+      category: data['category'] ?? 'Sponsored',
+      author: data['author'],
+      excerpt: data['excerpt'],
+      content: data['content'],
+      linkText: data['linkText'],
+      isSponsored: data['isSponsored'] ?? false,
+      source: data['source'],
     );
   }
 
-  // Returns the excerpt as properly formatted paragraphs
-  String get formattedContent {
-    if (content.isNotEmpty) {
-      // For sponsored articles with full content
-      return _formatText(content);
-    } else if (excerpt.isNotEmpty) {
-      // For RSS articles with only excerpt
-      return _formatText(excerpt);
+  // Convert to and from JSON for caching
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'guid': guid,
+      'title': title,
+      'description': description,
+      'url': url,
+      'imageUrl': imageUrl,
+      'publishDate': publishDate.toIso8601String(),
+      'category': category,
+      'author': author,
+      'excerpt': excerpt,
+      'content': content,
+      'linkText': linkText,
+      'isSponsored': isSponsored,
+      'source': source,
+    };
+  }
+
+  factory Article.fromJson(Map<String, dynamic> json) {
+    return Article(
+      title: json['title'] ?? '',
+      description: json['description'] ?? '',
+      url: json['url'] ?? '',
+      imageUrl: json['imageUrl'] ?? '',
+      publishDate:
+          json['publishDate'] != null
+              ? DateTime.parse(json['publishDate'])
+              : DateTime.now(),
+      guid: json['guid'] ?? '',
+      author: json['author'] ?? 'Neuse News',
+      content: json['content'] ?? '',
+      // Don't include excerpt here
+    );
+  }
+
+  bool isValidUrl(String url) {
+    try {
+      final uri = Uri.parse(url);
+      return uri.scheme == 'http' || uri.scheme == 'https';
+    } catch (e) {
+      return false;
     }
-    return '';
-  }
-
-  // Helper method to format text
-  String _formatText(String text) {
-    // Clean up common RSS/HTML issues
-    String cleanedText =
-        text
-            // Replace HTML line breaks with actual line breaks
-            .replaceAll(RegExp(r'<br\s*\/?>'), '\n')
-            // Replace multiple consecutive line breaks with double line breaks
-            .replaceAll(RegExp(r'\n{3,}'), '\n\n')
-            // Replace HTML entities
-            .replaceAll('&nbsp;', ' ')
-            .replaceAll('&amp;', '&')
-            .replaceAll('&quot;', '"')
-            .replaceAll('&apos;', "'")
-            .replaceAll('&lt;', '<')
-            .replaceAll('&gt;', '>')
-            // Remove any remaining HTML tags
-            .replaceAll(RegExp(r'<[^>]*>'), '')
-            // Trim extra spaces
-            .replaceAll(RegExp(r'\s{2,}'), ' ')
-            .trim();
-
-    // Split into paragraphs and clean up each paragraph
-    List<String> paragraphs = cleanedText.split('\n\n');
-    paragraphs = paragraphs.map((p) => p.trim()).toList();
-
-    // Remove empty paragraphs
-    paragraphs.removeWhere((p) => p.isEmpty);
-
-    // Join with double line breaks for proper paragraph separation
-    return paragraphs.join('\n\n');
-  }
-
-  // Helper method to get a shorter excerpt for previews
-  String get shortExcerpt {
-    if (excerpt.length <= 100) return excerpt;
-    return '${excerpt.substring(0, 97)}...';
   }
 }
