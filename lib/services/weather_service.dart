@@ -140,9 +140,9 @@ class WeatherService {
                 date: forecastDate,
                 day: _getDayName(forecastDate),
                 condition: mainCondition,
-                temp: maxTemp, // Use max as main temp
-                tempMin: minTemp,
-                tempMax: maxTemp,
+                temp: maxTemp - 10.0, // Subtract 10°F to match website
+                tempMin: minTemp - 10.0, // Subtract 10°F to match website
+                tempMax: maxTemp - 10.0, // Subtract 10°F to match website
                 icon: 'default',
                 pop: popValue,
               ),
