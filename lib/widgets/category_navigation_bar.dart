@@ -32,6 +32,11 @@ class _CategoryNavigationBarState extends State<CategoryNavigationBar> {
     super.dispose();
   }
 
+  void _navigateToCategory(String category) {
+    // All categories now use the NewsScreen with tab selection
+    Navigator.pushNamed(context, '/news', arguments: category);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -66,6 +71,7 @@ class _CategoryNavigationBarState extends State<CategoryNavigationBar> {
                       _selectedCategory = category.id;
                     });
                     widget.onCategorySelected(category.id);
+                    _navigateToCategory(category.id);
                   },
                   child: Container(
                     alignment: Alignment.center,

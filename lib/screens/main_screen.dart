@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:neusenews/screens/dashboard_screen.dart';
-import 'package:neusenews/features/news/screens/local_news_screen.dart';
+
 import 'package:neusenews/features/weather/screens/weather_screen.dart';
 import 'package:neusenews/features/events/screens/calendar_screen.dart';
-import 'package:neusenews/features/news/screens/sports_screen.dart';
-import 'package:neusenews/features/news/screens/politics_screen.dart';
-import 'package:neusenews/features/news/screens/obituaries_screen.dart';
-import 'package:neusenews/features/news/screens/public_notices_screen.dart';
-import 'package:neusenews/features/news/screens/columns_screen.dart';
-import 'package:neusenews/features/news/screens/classifieds_screen.dart';
+import 'package:neusenews/features/news/screens/news_screen.dart';
+
 import 'package:neusenews/widgets/app_drawer.dart';
 
 class MainScreen extends StatefulWidget {
@@ -26,7 +22,6 @@ class _MainScreenState extends State<MainScreen> {
 
   final List<Widget> _screens = [
     const DashboardScreen(),
-    const LocalNewsScreen(showAppBar: false),
     const WeatherScreen(showAppBar: false),
     const CalendarScreen(showAppBar: false),
   ];
@@ -110,24 +105,12 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildNewsContent() {
-    switch (_currentCategory) {
-      case 'localnews':
-        return const LocalNewsScreen(showAppBar: false);
-      case 'sports':
-        return const SportsScreen(showAppBar: false);
-      case 'politics':
-        return const PoliticsScreen(showAppBar: false);
-      case 'columns':
-        return const ColumnsScreen(showAppBar: false);
-      case 'classifieds':
-        return const ClassifiedsScreen(showAppBar: false);
-      case 'obituaries':
-        return const ObituariesScreen(showAppBar: false);
-      case 'publicnotices':
-        return const PublicNoticesScreen(showAppBar: false);
-      default:
-        return const LocalNewsScreen(showAppBar: false);
-    }
+    // Use the NewsScreen with the current category as an argument
+    return NewsScreen(
+      showAppBar: false,
+      showBottomNav: false,
+      initialTab: _currentCategory,
+    );
   }
 
   @override

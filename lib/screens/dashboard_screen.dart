@@ -31,8 +31,21 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
-  bool _isRefreshing = false;
+  final bool _isRefreshing = false;
   bool _isInitialized = false;
+
+  // Add these fields to your _DashboardScreenState class
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _sectionKeys = {
+    'local': GlobalKey(),
+    'sports': GlobalKey(),
+    'politics': GlobalKey(),
+    'columns': GlobalKey(),
+    'obituaries': GlobalKey(),
+    'publicnotices': GlobalKey(),
+    'classifieds': GlobalKey(),
+    'matters': GlobalKey(),
+  };
 
   @override
   void initState() {
@@ -161,6 +174,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     ];
 
     return SingleChildScrollView(
+      controller: _scrollController, // Add this line
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -169,8 +183,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             categories: categories,
             initialCategory: 'local',
             onCategorySelected: (categoryId) {
-              final category = categories.firstWhere((c) => c.id == categoryId);
-              Navigator.pushNamed(context, category.route);
+              // Scroll to the section instead of navigating
+              if (_sectionKeys.containsKey(categoryId)) {
+                _scrollToSection(categoryId);
+              }
             },
           ),
           // Title sponsor banner (existing)
@@ -366,28 +382,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final news = newsSelector(newsProvider);
         if (news.isEmpty) return const SizedBox.shrink();
 
-        // Here's where we'll modify to insert ads
         return Column(
+          key: _sectionKeys[categoryKey], // Add this line
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Section header remains the same
-            Padding(
+            // Uniform section headers
+            Container(
               padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+              decoration: const BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: Color(0xFFd2982a), width: 1.0),
+                ),
+              ),
               child: Row(
                 children: [
-                  Text(title, style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2d2c31),
+                    ),
+                  ),
                   const Spacer(),
                   TextButton(
                     onPressed:
-                        () => Navigator.pushNamed(context, '/$categoryKey'),
-                    child: const Text('See All'),
+                        () => Navigator.pushNamed(
+                          context,
+                          '/news',
+                          arguments: title, // Pass the tab name as argument
+                        ),
+                    child: const Text(
+                      'See All',
+                      style: TextStyle(fontSize: 14, color: Color(0xFFd2982a)),
+                    ),
                   ),
                 ],
               ),
             ),
-            // Replace the existing ListView with our modified one that includes ads
+            // Rest of the section remains the same
             SizedBox(
-              height: 180, // Reduced further from 224
+              height: 180,
               child: _buildNewsListWithAds(news, AdType.inFeedDashboard),
             ),
           ],
@@ -400,7 +435,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildNewsListWithAds(List<Article> articles, AdType adType) {
     final List<Widget> itemsWithAds = [];
-    const int adFrequency = 3; // Insert ad after every 3rd article
+    const int adFrequency = 5; // Insert ad after every 5th article
 
     for (int i = 0; i < articles.length; i++) {
       // Add the article
@@ -442,5 +477,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8.0),
       itemBuilder: (context, index) => itemsWithAds[index],
     );
+  }
+
+  void _scrollToSection(String categoryId) {
+    final key = _sectionKeys[categoryId];
+    if (key?.currentContext != null) {
+      Scrollable.ensureVisible(
+        key!.currentContext!,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+        alignment: 0.0, // Top of the screen
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 }

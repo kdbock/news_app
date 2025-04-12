@@ -1,22 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:neusenews/features/advertising/models/ad.dart';
-import 'package:neusenews/features/advertising/models/ad_type.dart';
 import 'package:neusenews/features/advertising/services/ad_service.dart';
+import 'package:neusenews/features/advertising/models/ad_type.dart';
+import 'package:neusenews/features/advertising/models/ad_status.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:math';
 import 'package:neusenews/di/service_locator.dart';
+import 'package:neusenews/features/advertising/repositories/ad_repository.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AdBanner extends StatefulWidget {
   final AdType adType;
   final double height;
-  final EdgeInsetsGeometry padding;
+  final EdgeInsets padding;
   final BorderRadius borderRadius;
 
   const AdBanner({
     super.key,
     required this.adType,
-    this.height = 100,
-    this.padding = const EdgeInsets.all(8.0),
-    this.borderRadius = const BorderRadius.all(Radius.circular(4.0)),
+    this.height = 120,
+    this.padding = EdgeInsets.zero,
+    this.borderRadius = BorderRadius.zero,
   });
 
   @override
@@ -24,141 +29,374 @@ class AdBanner extends StatefulWidget {
 }
 
 class _AdBannerState extends State<AdBanner> {
-  final AdService _adService = serviceLocator<AdService>();
+  final AdService _adService = AdService(
+    repository: serviceLocator<AdRepository>(),
+    auth: serviceLocator<FirebaseAuth>(),
+  );
+
+  Ad? _ad;
+  bool _isLoading = true;
+  bool _hasAttemptedLoad = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAd();
+  }
+
+  // Helper method to convert string status to AdStatus enum
+  AdStatus _getStatusFromString(String statusStr) {
+    switch (statusStr.toLowerCase()) {
+      case 'active':
+        return AdStatus.active;
+      case 'pending':
+        return AdStatus.pending;
+      case 'expired':
+        return AdStatus.expired;
+      default:
+        return AdStatus.active;
+    }
+  }
+
+  Future<void> _loadAd() async {
+    if (_hasAttemptedLoad) return;
+    _hasAttemptedLoad = true;
+
+    try {
+      debugPrint(
+        '[AdBanner] Loading ads from Firestore for type: ${widget.adType}',
+      );
+
+      // Query for banner ads (type 4)
+      QuerySnapshot snapshot =
+          await FirebaseFirestore.instance
+              .collection('ads')
+              .where('type', isEqualTo: widget.adType.index)
+              .limit(5)
+              .get();
+
+      debugPrint('[AdBanner] Found ${snapshot.docs.length} banner ads');
+
+      // If no specific banner ads found, try any active ad as fallback
+      if (snapshot.docs.isEmpty) {
+        snapshot =
+            await FirebaseFirestore.instance
+                .collection('ads')
+                .where('status', whereIn: [AdStatus.active.index, 'active'])
+                .limit(5)
+                .get();
+
+        debugPrint(
+          '[AdBanner] Found ${snapshot.docs.length} active ads as fallback',
+        );
+      }
+
+      if (snapshot.docs.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        debugPrint('[AdBanner] No ads available to display');
+        return;
+      }
+
+      // Output sample data for debugging
+      if (snapshot.docs.isNotEmpty) {
+        final sampleData = snapshot.docs.first.data() as Map<String, dynamic>;
+        debugPrint('[AdBanner] Sample ad data: ${sampleData.keys.toList()}');
+      }
+
+      // Pick a random ad from the results
+      final randomIndex = Random().nextInt(snapshot.docs.length);
+      final doc = snapshot.docs[randomIndex];
+      final data = doc.data() as Map<String, dynamic>;
+
+      // Fix the status field handling to support both int and string values
+      AdStatus adStatus;
+      if (data['status'] is int) {
+        adStatus = AdStatus.values[data['status'] as int];
+      } else if (data['status'] is String) {
+        adStatus = _getStatusFromString(data['status'] as String);
+      } else {
+        adStatus = AdStatus.active; // Default
+      }
+
+      // Extract ad data with flexible field handling
+      final Ad ad = Ad(
+        id: doc.id,
+        headline: data['headline'] ?? '',
+        description: data['description'] ?? '',
+        imageUrl: data['imageUrl'] ?? '',
+        linkUrl: data['linkUrl'] ?? '',
+        businessName: data['businessName'] ?? '',
+        businessId: data['businessId'] ?? '',
+        cost: (data['cost'] ?? 0.0).toDouble(),
+        type: AdType.values[data['type'] ?? 0],
+        status: adStatus,
+        startDate:
+            (data['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+        endDate:
+            (data['endDate'] as Timestamp?)?.toDate() ??
+            DateTime.now().add(const Duration(days: 30)),
+      );
+
+      if (mounted) {
+        setState(() {
+          _ad = ad;
+          _isLoading = false;
+        });
+
+        // Record impression
+        if (ad.id != null) {
+          _adService.recordImpression(ad.id!);
+          debugPrint('[AdBanner] Recorded impression for ad: ${ad.id}');
+        }
+      }
+    } catch (e, stack) {
+      debugPrint('[AdBanner] Error loading ad: $e');
+      debugPrint('[AdBanner] Stack trace: $stack');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Ad>>(
-      stream: _adService.getActiveAdsByType(widget.adType),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoadingPlaceholder();
-        }
-
-        if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
-          debugPrint("Ad error: ${snapshot.error}");
-          return _buildEmptyAdSpace();
-        }
-
-        final ads = snapshot.data;
-        if (ads == null || ads.isEmpty) {
-          return const SizedBox.shrink(); // No ad to display
-        }
-
-        final ad = ads[0];
-
-        // Record impression
-        _adService.recordImpression(ad.id!);
-
-        return _buildAdContent(ad);
-      },
-    );
-  }
-
-  Widget _buildLoadingPlaceholder() {
-    return SizedBox(
-      height: widget.height,
-      child: const Center(child: CircularProgressIndicator()),
-    );
-  }
-
-  Widget _buildEmptyAdSpace() {
-    return Container(
-      height: widget.height,
-      padding: widget.padding,
-      child: Card(
-        child: Center(
-          child: Text(
-            "Advertisement Space Available",
-            style: TextStyle(color: Colors.grey.shade600),
+    if (_isLoading) {
+      return Padding(
+        padding: widget.padding,
+        child: Container(
+          height: widget.height,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: widget.borderRadius,
+          ),
+          child: Center(
+            child: SizedBox(
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFFd2982a),
+              ),
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildAdContent(Ad ad) {
-    return GestureDetector(
-      onTap: () => _handleAdClick(ad),
-      child: Card(
-        margin: const EdgeInsets.symmetric(vertical: 8.0),
-        shape: RoundedRectangleBorder(borderRadius: widget.borderRadius),
+    if (_ad == null) {
+      // Return placeholder with proper styling
+      return Padding(
+        padding: widget.padding,
         child: Container(
-          padding: widget.padding,
-          child: Row(
+          height: widget.height,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: widget.borderRadius,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildAdImage(ad),
-              const SizedBox(width: 12.0),
-              Expanded(child: _buildAdDetails(ad)),
+              Icon(Icons.business_center, size: 32, color: Colors.grey[500]),
+              const SizedBox(height: 8),
+              Text(
+                'Advertisement',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildAdImage(Ad ad) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(4.0),
-      child: Image.network(
-        ad.imageUrl,
-        width: 80,
-        height: 80,
-        fit: BoxFit.cover,
-        errorBuilder:
-            (context, error, stackTrace) =>
-                const Icon(Icons.broken_image, size: 80),
-      ),
-    );
-  }
+    final ad = _ad!;
+    debugPrint('[AdBanner] Building UI for ad: ${ad.id} - ${ad.headline}');
 
-  Widget _buildAdDetails(Ad ad) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              'SPONSORED',
-              style: TextStyle(
-                fontSize: 10.0,
-                color: Colors.grey,
-                fontWeight: FontWeight.bold,
+    return Padding(
+      padding: widget.padding,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () async {
+            try {
+              debugPrint('[AdBanner] Ad clicked: ${ad.id}');
+
+              // Record click
+              if (ad.id != null) {
+                _adService.recordClick(ad.id!);
+              }
+
+              // Handle links
+              final urlString = ad.linkUrl.trim();
+              if (urlString.isEmpty) return;
+
+              if (urlString == 'advertising_options' ||
+                  urlString.contains('advertising_options') ||
+                  urlString.startsWith('app://')) {
+                Navigator.of(context).pushNamed('/advertising-options');
+              } else {
+                final urlToLaunch =
+                    urlString.startsWith('http')
+                        ? urlString
+                        : 'https://$urlString';
+
+                final Uri url = Uri.parse(urlToLaunch);
+                if (!await launchUrl(
+                  url,
+                  mode: LaunchMode.externalApplication,
+                )) {
+                  debugPrint('[AdBanner] Could not launch URL: $url');
+                }
+              }
+            } catch (e) {
+              debugPrint('[AdBanner] Error handling ad click: $e');
+            }
+          },
+          borderRadius: widget.borderRadius,
+          child: Container(
+            height: widget.height,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: widget.borderRadius,
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: ClipRRect(
+              borderRadius: widget.borderRadius,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Ad image
+                  if (ad.imageUrl.isNotEmpty &&
+                      !ad.imageUrl.contains('placeholder.com'))
+                    ClipRRect(
+                      borderRadius: BorderRadius.only(
+                        topLeft: widget.borderRadius.topLeft,
+                        bottomLeft: widget.borderRadius.bottomLeft,
+                      ),
+                      child: Image.network(
+                        ad.imageUrl,
+                        width: widget.height * 0.85,
+                        height: widget.height,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, _) {
+                          debugPrint('[AdBanner] Image error: $error');
+                          return Container(
+                            width: widget.height * 0.85,
+                            height: widget.height,
+                            color: Colors.grey[200],
+                            child: Icon(
+                              Icons.image_not_supported,
+                              color: Colors.grey[400],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                  // Ad content
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Sponsored tag
+                          Row(
+                            children: [
+                              Text(
+                                'SPONSORED',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const Spacer(),
+                              if (ad.businessName.isNotEmpty)
+                                Text(
+                                  ad.businessName,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          // Headline
+                          Text(
+                            ad.headline,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          // Description if available
+                          if (ad.description.isNotEmpty)
+                            Expanded(
+                              child: Text(
+                                ad.description,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[800],
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+
+                          // Learn more button
+                          Align(
+                            alignment: Alignment.bottomRight,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFd2982a),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Text(
+                                'Learn More',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Spacer(),
-            Text(
-              ad.businessName,
-              style: const TextStyle(fontSize: 10.0, color: Colors.grey),
-            ),
-          ],
+          ),
         ),
-        const SizedBox(height: 4.0),
-        Text(
-          ad.headline,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16.0),
-        ),
-        const SizedBox(height: 4.0),
-        Text(
-          ad.description,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12.0),
-        ),
-      ],
+      ),
     );
-  }
-
-  Future<void> _handleAdClick(Ad ad) async {
-    try {
-      await _adService.recordClick(ad.id!);
-
-      final Uri url = Uri.parse(ad.linkUrl);
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url);
-      }
-    } catch (e) {
-      debugPrint("Error handling ad click: $e");
-    }
   }
 }

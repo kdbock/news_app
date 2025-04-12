@@ -6,7 +6,6 @@ import 'package:neusenews/features/advertising/models/ad_type.dart';
 import 'package:neusenews/features/advertising/models/ad_status.dart';
 import 'package:neusenews/features/advertising/repositories/ad_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:neusenews/features/advertising/models/ad_view.dart';
 
 class AdService {
   final AdRepository repository;

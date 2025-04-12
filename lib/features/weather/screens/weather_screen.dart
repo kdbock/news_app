@@ -7,6 +7,7 @@ import 'package:neusenews/widgets/bottom_nav_bar.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:neusenews/features/advertising/widgets/weather_sponsor_banner.dart';
 
 class WeatherScreen extends StatefulWidget {
   final bool showAppBar;
@@ -397,6 +398,11 @@ class _WeatherScreenState extends State<WeatherScreen>
             ),
           ),
         ),
+
+        const SizedBox(height: 16),
+
+        // Add weather sponsor banner here - right before weather details
+        const WeatherSponsorBanner(),
 
         const SizedBox(height: 16),
 

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:neusenews/features/advertising/models/ad.dart';
 import 'package:neusenews/features/advertising/services/ad_service.dart';
 import 'package:neusenews/di/service_locator.dart';
 import 'package:firebase_auth/firebase_auth.dart';

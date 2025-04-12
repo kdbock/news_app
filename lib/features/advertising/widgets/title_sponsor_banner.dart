@@ -3,12 +3,10 @@ import 'package:neusenews/features/advertising/models/ad.dart';
 import 'package:neusenews/features/advertising/models/ad_type.dart';
 import 'package:neusenews/features/advertising/models/ad_status.dart';
 import 'package:neusenews/features/advertising/services/ad_service.dart';
-import 'package:neusenews/features/advertising/repositories/ad_repository.dart'; // Added import
+// Added import
 import 'package:neusenews/di/service_locator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:neusenews/features/advertising/screens/advertising_options_screen.dart';
 
 class TitleSponsorBanner extends StatefulWidget {
   const TitleSponsorBanner({super.key});

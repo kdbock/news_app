@@ -94,6 +94,19 @@ class NewsService {
         try {
           final channel = RssFeed.parse(response.body).items ?? [];
 
+          // Debug the first item to see what author data is available
+          if (channel.isNotEmpty) {
+            final firstItem = channel.first;
+            debugPrint('RSS DEBUG - URL: $url');
+            debugPrint('RSS DEBUG - Author: ${firstItem.author}');
+            debugPrint('RSS DEBUG - DC Creator: ${firstItem.dc?.creator}');
+            if (firstItem.content?.value != null) {
+              debugPrint(
+                'RSS DEBUG - Content snippet: ${firstItem.content!.value.substring(0, min(100, firstItem.content!.value.length))}',
+              );
+            }
+          }
+
           for (final item in channel ?? []) {
             // Extract article data
             final article = _convertRssItemToArticle(item);
@@ -604,7 +617,7 @@ class NewsService {
   Article _convertRssItemToArticle(RssItem item) {
     // Extract data from RSS item
     final title = item.title ?? 'Untitled';
-    final author = item.author ?? 'Neuse News Staff';
+    final author = _extractAuthor(item);
     final link = item.link ?? '';
     final publishDate =
         item.pubDate != null
@@ -638,5 +651,55 @@ class NewsService {
       publishDate: publishDate,
       categories: categories, // Now this is guaranteed to be non-nullable
     );
+  }
+
+  // More comprehensive author extraction:
+
+  String _extractAuthor(RssItem item) {
+    // Check standard author field
+    if (item.author != null && item.author!.isNotEmpty) {
+      // Clean up email format if needed: "name@email.com (Name)" → "Name"
+      final emailRegex = RegExp(r'\((.*?)\)');
+      final match = emailRegex.firstMatch(item.author!);
+      if (match != null && match.group(1) != null) {
+        return match.group(1)!.trim();
+      }
+      return item.author!.trim();
+    }
+
+    // Check Dublin Core creator
+    if (item.dc?.creator != null && item.dc!.creator!.isNotEmpty) {
+      return item.dc!.creator!.trim();
+    }
+
+    // Try to extract from content
+    if (item.content?.value != null) {
+      final contentText = item.content!.value;
+
+      // Try patterns like "By John Smith" or "Author: John Smith"
+      final bylinePatterns = [
+        RegExp(r'By\s+([^<|,]+)', caseSensitive: false),
+        RegExp(r'Author:\s+([^<|,]+)', caseSensitive: false),
+        RegExp(r'Written by\s+([^<|,]+)', caseSensitive: false),
+      ];
+
+      for (final pattern in bylinePatterns) {
+        final match = pattern.firstMatch(contentText);
+        if (match != null && match.group(1) != null) {
+          return match.group(1)!.trim();
+        }
+      }
+    }
+
+    // For specific feeds that always have the same source
+    final source = item.source?.value.toLowerCase() ?? '';
+    if (source.contains('neuse news sports')) {
+      return 'Neuse News Sports';
+    } else if (source.contains('nc political')) {
+      return 'NC Political News';
+    }
+
+    // Default fallback
+    return 'Neuse News Staff';
   }
 }

@@ -2,20 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:neusenews/models/article.dart';
 import 'package:neusenews/services/news_service.dart';
-import 'package:neusenews/widgets/app_drawer.dart';
 import 'package:neusenews/widgets/bottom_nav_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
+import 'package:neusenews/features/advertising/widgets/news_feed_ad_banner.dart';
+import 'package:neusenews/widgets/news_search_delegate.dart';
 
 class NewsScreen extends StatefulWidget {
   final bool showAppBar;
   final bool showBottomNav;
+  final String? initialTab; // New parameter
 
   const NewsScreen({
     super.key,
     this.showAppBar = true,
     this.showBottomNav = true,
+    this.initialTab, // Add this parameter
   });
 
   @override
@@ -40,20 +43,67 @@ class _NewsScreenState extends State<NewsScreen>
 
   // For tab controller
   late TabController _tabController;
-  final List<String> _tabs = ['All News', 'Local', 'Sports', 'Politics'];
+  final List<String> _tabs = [
+    'All News',
+    'Local News',
+    'State News',
+    'Sports',
+    'Politics',
+    'Columns',
+    'Matters of Record',
+    'Obituaries',
+    'Public Notice',
+    'Classifieds',
+  ];
   Map<String, List<Article>> _categorizedArticles = {};
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: _tabs.length, vsync: this);
-    _tabController.addListener(_handleTabChange);
 
+    // Clear all caches to ensure fresh data
+    _newsService.clearAllCaches(); // Add this line
+
+    // Initialize tab controller
+    _tabController = TabController(length: _tabs.length, vsync: this);
+
+    // Set initial tab if specified
+    if (widget.initialTab != null) {
+      final initialTabIndex = _tabs.indexWhere(
+        (tab) =>
+            tab == widget.initialTab ||
+            tab.toLowerCase() == widget.initialTab!.toLowerCase(),
+      );
+
+      if (initialTabIndex >= 0) {
+        _tabController.animateTo(initialTabIndex);
+      }
+    }
+
+    _tabController.addListener(_handleTabChange);
     _checkConnectivity();
     _loadArticles();
-
-    // Add scroll listener for infinite scrolling
     _scrollController.addListener(_scrollListener);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Get any arguments passed during navigation
+    final args = ModalRoute.of(context)?.settings.arguments;
+
+    if (args is String) {
+      // Find the matching tab
+      final tabIndex = _tabs.indexWhere(
+        (tab) => tab.toLowerCase() == args.toLowerCase(),
+      );
+
+      if (tabIndex >= 0 && _tabController.index != tabIndex) {
+        // Switch to the selected tab
+        _tabController.animateTo(tabIndex);
+      }
+    }
   }
 
   @override
@@ -108,6 +158,9 @@ class _NewsScreenState extends State<NewsScreen>
   }
 
   Future<void> _loadArticles({bool refresh = false}) async {
+    // Force a refresh to bypass cache
+    refresh = true; // Add this line temporarily
+
     if (refresh) {
       setState(() {
         _currentPage = 0;
@@ -130,43 +183,61 @@ class _NewsScreenState extends State<NewsScreen>
         return;
       }
 
-      // Fetch from all three RSS sources
-      final localNews = await _newsService.fetchNewsByUrl(
-        'https://www.neusenews.com/index?format=rss',
-        skip: 0,
-        take: _pageSize * 2, // Fetch more to populate categories
-      );
-
-      final sportsNews = await _newsService.fetchNewsByUrl(
-        'https://www.neusenewssports.com/news-1?format=rss',
-        skip: 0,
-        take: _pageSize * 2,
-      );
-
-      final politicalNews = await _newsService.fetchNewsByUrl(
-        'https://www.ncpoliticalnews.com/news?format=rss',
-        skip: 0,
-        take: _pageSize * 2,
-      );
-
-      // Categorize articles
-      _categorizedArticles = {
-        'Local': localNews,
-        'Sports': sportsNews,
-        'Politics': politicalNews,
+      // Define RSS feed URLs for each category
+      final Map<String, String> rssFeeds = {
+        'Local News':
+            'https://www.neusenews.com/index/category/Local+News?format=rss',
+        'State News':
+            'https://www.neusenews.com/index/category/NC+News?format=rss',
+        'Sports': 'https://www.neusenewssports.com/news-1?format=rss',
+        'Politics': 'https://www.ncpoliticalnews.com/news?format=rss',
+        'Columns':
+            'https://www.neusenews.com/index/category/Columns?format=rss',
+        'Matters of Record':
+            'https://www.neusenews.com/index/category/Matters+of+Record?format=rss',
+        'Obituaries':
+            'https://www.neusenews.com/index/category/Obituaries?format=rss',
+        'Public Notice':
+            'https://www.neusenews.com/index/category/Public+Notices?format=rss',
+        'Classifieds':
+            'https://www.neusenews.com/index/category/Classifieds?format=rss',
       };
 
-      // Combine all articles
-      final List<Article> combinedArticles = [];
-      combinedArticles.addAll(localNews);
-      combinedArticles.addAll(sportsNews);
-      combinedArticles.addAll(politicalNews);
+      // Initialize categorized articles map
+      _categorizedArticles = {};
 
-      // Sort by publish date (newest first)
-      combinedArticles.sort((a, b) => b.publishDate.compareTo(a.publishDate));
+      // Fetch articles for each category
+      final List<Article> allArticles = [];
+
+      // Fetch from all feeds
+      for (final entry in rssFeeds.entries) {
+        final category = entry.key;
+        final feedUrl = entry.value;
+
+        try {
+          final articles = await _newsService.fetchNewsByUrl(
+            feedUrl,
+            skip: 0,
+            take: _pageSize * 2, // Fetch more to populate categories
+          );
+
+          // Store in category map
+          _categorizedArticles[category] = articles;
+
+          // Add to combined list
+          allArticles.addAll(articles);
+        } catch (e) {
+          debugPrint('Error fetching $category feed: $e');
+          // Continue with other feeds if one fails
+          _categorizedArticles[category] = [];
+        }
+      }
+
+      // Sort all articles by publish date (newest first)
+      allArticles.sort((a, b) => b.publishDate.compareTo(a.publishDate));
 
       // Remove duplicates
-      final uniqueArticles = _removeDuplicates(combinedArticles);
+      final uniqueArticles = _removeDuplicates(allArticles);
 
       if (mounted) {
         setState(() {
@@ -268,12 +339,28 @@ class _NewsScreenState extends State<NewsScreen>
 
   // Get color based on article source/category
   Color _getCategoryColor(Article article) {
-    if (article.source.toLowerCase().contains('sports')) {
-      return Colors.green;
-    } else if (article.source.toLowerCase().contains('politic')) {
-      return Colors.blue;
+    final source = article.source.toLowerCase();
+
+    // Check source name for matches
+    if (source.contains('sports')) {
+      return Colors.green[700]!;
+    } else if (source.contains('politic')) {
+      return Colors.blue[700]!;
+    } else if (source.contains('state') || source.contains('nc news')) {
+      return Colors.purple[700]!;
+    } else if (source.contains('obituaries')) {
+      return Colors.grey[700]!;
+    } else if (source.contains('columns')) {
+      return Colors.teal[700]!;
+    } else if (source.contains('matters of record')) {
+      return Colors.indigo[700]!;
+    } else if (source.contains('public notice')) {
+      return Colors.amber[800]!;
+    } else if (source.contains('classifieds')) {
+      return Colors.brown[600]!;
     } else {
-      return const Color(0xFFd2982a); // Gold for local news
+      // Default for Local News
+      return const Color(0xFFd2982a);
     }
   }
 
@@ -283,30 +370,34 @@ class _NewsScreenState extends State<NewsScreen>
       appBar:
           widget.showAppBar
               ? AppBar(
-                title: const Text(
-                  'NEWS',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
-                  ),
+                // Replace hamburger menu with back button
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.of(context).maybePop(),
                 ),
-                centerTitle: true,
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFF2d2c31),
+                title: const Text('News'),
+                backgroundColor: const Color(0xFFd2982a),
+                foregroundColor: Colors.white,
                 elevation: 0,
                 bottom: TabBar(
                   controller: _tabController,
-                  labelColor: const Color(0xFFd2982a),
-                  unselectedLabelColor: Colors.grey[600],
-                  indicatorColor: const Color(0xFFd2982a),
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Colors.white.withOpacity(0.7),
+                  indicatorColor: Colors.white,
                   indicatorWeight: 3.0,
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold),
                   tabs: _tabs.map((tab) => Tab(text: tab)).toList(),
                   isScrollable: true,
                 ),
+                // Add search icon in the app bar
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: () => _showSearchDialog(context),
+                  ),
+                ],
               )
               : null,
-      drawer: widget.showAppBar ? const AppDrawer() : null,
       body:
           _isLoading
               ? _buildLoadingShimmer()
@@ -316,12 +407,11 @@ class _NewsScreenState extends State<NewsScreen>
       bottomNavigationBar:
           widget.showBottomNav
               ? AppBottomNavBar(
-                currentIndex: 1, // News is selected
+                currentIndex: 1,
                 onTap: (index) {
-                  // Add this navigation logic
                   switch (index) {
                     case 0: // Home
-                      Navigator.pushReplacementNamed(context, '/dashboard');
+                      Navigator.pushReplacementNamed(context, '/');
                       break;
                     case 1: // News - already here
                       break;
@@ -335,6 +425,29 @@ class _NewsScreenState extends State<NewsScreen>
                 },
               )
               : null,
+    );
+  }
+
+  void _showSearchDialog(BuildContext context) {
+    // Prepare data for search delegate
+    // First prepare map of categorized articles to access as needed
+    final Map<String, List<Article>> articlesMap = {};
+
+    // Get the local news articles from _categorizedArticles
+    final localNews = _categorizedArticles['Local News'] ?? [];
+    final sportsNews = _categorizedArticles['Sports'] ?? [];
+    final columnsNews = _categorizedArticles['Columns'] ?? [];
+    final obituariesNews = _categorizedArticles['Obituaries'] ?? [];
+
+    // Show search delegate
+    showSearch(
+      context: context,
+      delegate: NewsSearchDelegate(
+        localNews,
+        sportsNews,
+        columnsNews,
+        obituariesNews,
+      ),
     );
   }
 
@@ -421,9 +534,11 @@ class _NewsScreenState extends State<NewsScreen>
               : ListView.builder(
                 controller: _scrollController,
                 padding: const EdgeInsets.all(16.0),
-                itemCount: _articles.length + (_hasMoreData ? 1 : 0),
+                // Add 1 for loading indicator + additional spots for ads
+                itemCount: _calculateListItemCount(),
                 itemBuilder: (context, index) {
-                  if (index == _articles.length) {
+                  // Show loading indicator at the end if more data is available
+                  if (index == _calculateListItemCount() - 1 && _hasMoreData) {
                     return Center(
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -435,16 +550,35 @@ class _NewsScreenState extends State<NewsScreen>
                     );
                   }
 
-                  final article = _articles[index];
+                  // Determine if this position should be an ad
+                  // Insert ad after every 4 articles (index 4, 9, 14, etc.)
+                  // Account for featured article at index 0
+                  final adFrequency = 4;
+                  final adjustedIndex = index;
+
+                  if ((adjustedIndex + 1) % (adFrequency + 1) == 0 &&
+                      adjustedIndex > 0) {
+                    // This position should be an ad
+                    return _buildInFeedAd();
+                  }
+
+                  // Calculate actual article index (accounting for ads)
+                  final articleIndex = _getArticleIndexFromListIndex(index);
+                  if (articleIndex >= _articles.length) {
+                    // Safety check in case calculations are off
+                    return const SizedBox.shrink();
+                  }
+
+                  final article = _articles[articleIndex];
                   final categoryColor = _getCategoryColor(article);
 
                   // Featured article (first item)
-                  if (index == 0 && _tabController.index == 0) {
+                  if (articleIndex == 0 && _tabController.index == 0) {
                     return _buildFeaturedArticleCard(article);
                   }
 
                   // Determine layout style
-                  if (index % 3 == 0) {
+                  if (articleIndex % 3 == 0) {
                     return _buildLargeArticleCard(article, categoryColor);
                   } else {
                     return _buildCompactArticleCard(article, categoryColor);
@@ -452,6 +586,32 @@ class _NewsScreenState extends State<NewsScreen>
                 },
               ),
     );
+  }
+
+  // Add these helper methods for ad insertion
+  int _calculateListItemCount() {
+    if (_articles.isEmpty) return 0;
+
+    // Base article count
+    int count = _articles.length;
+
+    // Add spots for ads (1 ad for every 4 articles)
+    count += (_articles.length - 1) ~/ 4;
+
+    // Add 1 for loading indicator if needed
+    if (_hasMoreData) count++;
+
+    return count;
+  }
+
+  int _getArticleIndexFromListIndex(int listIndex) {
+    // Every 5th position (after the first 4 items) is an ad
+    // So we need to adjust for that
+    return listIndex - (listIndex ~/ 5);
+  }
+
+  Widget _buildInFeedAd() {
+    return const NewsFeedAdBanner();
   }
 
   Widget _buildFeaturedArticleCard(Article article) {

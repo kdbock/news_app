@@ -18,17 +18,9 @@ import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 import 'package:neusenews/screens/splash_screen.dart';
 import 'package:neusenews/screens/dashboard_screen.dart';
 import 'package:neusenews/features/news/screens/news_screen.dart';
-import 'package:neusenews/features/news/screens/local_news_screen.dart';
-import 'package:neusenews/features/news/screens/sports_screen.dart';
-import 'package:neusenews/features/news/screens/politics_screen.dart';
-import 'package:neusenews/features/news/screens/public_notices_screen.dart';
-import 'package:neusenews/features/news/screens/classifieds_screen.dart';
-import 'package:neusenews/features/news/screens/matters_of_record_screen.dart';
 import 'package:neusenews/features/weather/screens/weather_screen.dart';
 import 'package:neusenews/features/events/screens/calendar_screen.dart';
 import 'package:neusenews/features/news/screens/base_category_screen.dart';
-import 'package:neusenews/features/news/screens/obituaries_screen.dart';
-import 'package:neusenews/features/news/screens/columns_screen.dart';
 import 'package:neusenews/features/news/screens/article_detail_screen.dart';
 import 'package:neusenews/features/news/screens/bookmarks_screen.dart';
 import 'package:neusenews/features/users/screens/profile_screen.dart';
@@ -115,14 +107,6 @@ class MyApp extends StatelessWidget {
           '/news': (context) => const NewsScreen(),
           '/weather': (context) => const WeatherScreen(),
           '/calendar': (context) => const CalendarScreen(),
-          '/news/local': (context) => const LocalNewsScreen(),
-          '/news/sports': (context) => const SportsScreen(),
-          '/news/politics': (context) => const PoliticsScreen(),
-          '/news/columns': (context) => const ColumnsScreen(),
-          '/news/obituaries': (context) => const ObituariesScreen(),
-          '/news/public-notices': (context) => const PublicNoticesScreen(),
-          '/news/classifieds': (context) => const ClassifiedsScreen(),
-          '/news/matters-of-record': (context) => const MattersOfRecordScreen(),
           '/sponsored': (context) => const SponsoredArticlesScreen(),
           '/article': (context) => const ArticleDetailScreen(),
           '/bookmarks': (context) => const BookmarksScreen(),

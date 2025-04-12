@@ -8,6 +8,9 @@ import 'package:neusenews/services/analytics_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:convert';
+import 'package:neusenews/widgets/bottom_nav_bar.dart';
+import 'package:neusenews/features/advertising/widgets/ad_banner.dart';
+import 'package:neusenews/features/advertising/models/ad_type.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   const ArticleDetailScreen({super.key});
@@ -26,6 +29,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _showToTopButton = false;
   double _scrollProgress = 0.0;
+  final int _selectedIndex = 1; // Default to News tab (index 1)
 
   @override
   void initState() {
@@ -451,6 +455,16 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
 
                       const SizedBox(height: 24),
 
+                      // First banner ad
+                      const AdBanner(
+                        adType: AdType.bannerAd,
+                        height: 120,
+                        padding: EdgeInsets.symmetric(vertical: 12.0),
+                        borderRadius: BorderRadius.all(Radius.circular(8.0)),
+                      ),
+
+                      const SizedBox(height: 24),
+
                       // "Read article on website" button
                       SizedBox(
                         width: double.infinity,
@@ -503,17 +517,17 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
                           (relatedArticle) =>
                               _buildRelatedArticleItem(relatedArticle),
                         ),
+
+                        // Add second banner ad after related articles
+                        const SizedBox(height: 24),
+                        const AdBanner(
+                          adType: AdType.bannerAd,
+                          height: 120,
+                          padding: EdgeInsets.symmetric(vertical: 12.0),
+                          borderRadius: BorderRadius.all(Radius.circular(8.0)),
+                        ),
                       ] else if (_isLoadingRelated) ...[
                         const Divider(height: 32),
-                        const SizedBox(height: 8),
-                        const Center(
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16.0),
-                            child: CircularProgressIndicator(
-                              color: Color(0xFFd2982a),
-                            ),
-                          ),
-                        ),
                       ],
 
                       const SizedBox(height: 16),
@@ -556,6 +570,27 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen> {
               ),
             ),
         ],
+      ),
+      bottomNavigationBar: AppBottomNavBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          if (index == _selectedIndex) return;
+
+          switch (index) {
+            case 0:
+              Navigator.pushReplacementNamed(context, '/');
+              break;
+            case 1:
+              Navigator.pushReplacementNamed(context, '/news');
+              break;
+            case 2:
+              Navigator.pushReplacementNamed(context, '/weather');
+              break;
+            case 3:
+              Navigator.pushReplacementNamed(context, '/events');
+              break;
+          }
+        },
       ),
     );
   }
