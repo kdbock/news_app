@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:neusenews/features/advertising/models/ad.dart';
 import 'package:neusenews/features/advertising/services/ad_service.dart';
 import 'package:neusenews/features/advertising/models/ad_type.dart';
-import 'package:neusenews/features/advertising/models/ad_status.dart'; // Import AdStatus
+import 'package:neusenews/features/advertising/models/ad_status.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math';
 import 'package:neusenews/di/service_locator.dart';
@@ -34,17 +34,27 @@ class _InFeedAdBannerState extends State<InFeedAdBanner> {
     _loadAd();
   }
 
+  // Helper method to convert string status to AdStatus enum
+  AdStatus _getStatusFromString(String statusStr) {
+    switch (statusStr.toLowerCase()) {
+      case 'active':
+        return AdStatus.active;
+      case 'pending':
+        return AdStatus.pending;
+      case 'expired':
+        return AdStatus.expired;
+      default:
+        return AdStatus.active;
+    }
+  }
+
   Future<void> _loadAd() async {
     try {
       debugPrint(
         '[InFeedAdBanner] Loading ads from Firestore for type: ${widget.adType}',
       );
       debugPrint('[InFeedAdBanner] Type index: ${widget.adType.index}');
-      debugPrint(
-        '[InFeedAdBanner] Loading ${widget.adType.displayName} (index: ${widget.adType.index})',
-      );
 
-      // Query Firestore directly for more control
       final QuerySnapshot snapshot =
           await FirebaseFirestore.instance
               .collection('ads')
@@ -77,6 +87,16 @@ class _InFeedAdBannerState extends State<InFeedAdBanner> {
       final doc = snapshot.docs[randomIndex];
       final data = doc.data() as Map<String, dynamic>;
 
+      // Fix the status field handling to support both int and string values
+      AdStatus adStatus;
+      if (data['status'] is int) {
+        adStatus = AdStatus.values[data['status'] as int];
+      } else if (data['status'] is String) {
+        adStatus = _getStatusFromString(data['status'] as String);
+      } else {
+        adStatus = AdStatus.active; // Default
+      }
+
       // Extract ad data with flexible field handling
       final Ad ad = Ad(
         id: doc.id,
@@ -88,7 +108,7 @@ class _InFeedAdBannerState extends State<InFeedAdBanner> {
         businessId: data['businessId'] ?? '',
         cost: (data['cost'] ?? 0.0).toDouble(),
         type: AdType.values[data['type'] ?? 0],
-        status: AdStatus.values[data['status'] ?? 0],
+        status: adStatus, // Use the fixed status handling
         startDate:
             (data['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
         endDate:
@@ -105,7 +125,6 @@ class _InFeedAdBannerState extends State<InFeedAdBanner> {
         // Record impression
         if (ad.id != null) {
           _adService.recordImpression(ad.id!);
-          debugPrint('[InFeedAdBanner] Recorded impression for ad: ${ad.id}');
         }
       }
     } catch (e, stack) {
@@ -122,12 +141,22 @@ class _InFeedAdBannerState extends State<InFeedAdBanner> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const SizedBox(height: 100);
+      return SizedBox(
+        height: 128, // Reduced by another 20% from 160
+        width: 220,
+        child: Center(
+          child: SizedBox(
+            height: 16, // Also reduced
+            width: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      );
     }
 
     if (_ad == null) {
       debugPrint('[InFeedAdBanner] No ad to display');
-      return const SizedBox.shrink(); // No ad to show
+      return const SizedBox.shrink();
     }
 
     final ad = _ad!;
@@ -135,143 +164,124 @@ class _InFeedAdBannerState extends State<InFeedAdBanner> {
       '[InFeedAdBanner] Building UI for ad: ${ad.id} - ${ad.headline}',
     );
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      child: Card(
-        elevation: 2,
-        child: InkWell(
-          onTap: () async {
-            try {
-              // Record click
-              if (ad.id != null) {
-                _adService.recordClick(ad.id!);
-              }
-
-              // Check if internal or external link
-              final urlString = ad.linkUrl.trim();
-              if (urlString.isEmpty) return;
-
-              if (urlString == 'advertising_options' ||
-                  urlString.contains('advertising_options') ||
-                  urlString.startsWith('app://')) {
-                debugPrint(
-                  '[InFeedAdBanner] Navigating to advertising options page',
-                );
-
-                // Use named route navigation instead of direct class instantiation
-                Navigator.of(context).pushNamed('/advertising-options');
-
-                // If the above route doesn't exist, use this fallback approach
-                // Navigator.of(context).pushNamed('/advertise');
-              } else {
-                // Handle external link
-                final urlToLaunch =
-                    urlString.startsWith('http')
-                        ? urlString
-                        : 'https://$urlString';
-
-                final Uri url = Uri.parse(urlToLaunch);
-                if (!await launchUrl(
-                  url,
-                  mode: LaunchMode.externalApplication,
-                )) {
-                  debugPrint('Could not launch URL: $url');
-                }
-              }
-            } catch (e) {
-              debugPrint('Error handling ad click: $e');
+    return SizedBox(
+      height: 128, // Reduced by another 20% from 160
+      width: 220,
+      child: InkWell(
+        onTap: () async {
+          try {
+            // Record click
+            if (ad.id != null) {
+              _adService.recordClick(ad.id!);
             }
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Ad sponsor label
-                Row(
-                  children: [
-                    const Text(
-                      'SPONSORED',
-                      style: TextStyle(
-                        fontSize: 10.0,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      ad.businessName,
-                      style: const TextStyle(
-                        fontSize: 10.0,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
 
-                // Ad main content
-                Row(
+            // Handle links
+            final urlString = ad.linkUrl.trim();
+            if (urlString.isEmpty) return;
+
+            if (urlString == 'advertising_options' ||
+                urlString.contains('advertising_options') ||
+                urlString.startsWith('app://')) {
+              Navigator.of(context).pushNamed('/advertising-options');
+            } else {
+              final urlToLaunch =
+                  urlString.startsWith('http')
+                      ? urlString
+                      : 'https://$urlString';
+
+              final Uri url = Uri.parse(urlToLaunch);
+              if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                debugPrint('Could not launch URL: $url');
+              }
+            }
+          } catch (e) {
+            debugPrint('Error handling ad click: $e');
+          }
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Ad sponsor label
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8.0,
+                vertical: 4.0,
+              ),
+              child: Row(
+                children: [
+                  const Text(
+                    'SPONSORED',
+                    style: TextStyle(
+                      fontSize: 10.0,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    ad.businessName,
+                    style: const TextStyle(fontSize: 10.0, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+
+            // Ad image - constrainted to fixed dimensions
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                ad.imageUrl,
+                height: 70, // Reduced by another 20% from 88
+                width: double.infinity,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, _) {
+                  return Container(
+                    height: 70, // Match the reduced height
+                    width: double.infinity,
+                    color: Colors.grey[200],
+                    child: Icon(
+                      Icons.image_not_supported,
+                      color: Colors.grey[400],
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // Ad content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Ad image
-                    if (ad.imageUrl.isNotEmpty)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4.0),
-                        child: Image.network(
-                          ad.imageUrl,
-                          width: 120,
-                          height: 80,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, _) {
-                            debugPrint('[InFeedAdBanner] Image error: $error');
-                            return Container(
-                              width: 120,
-                              height: 80,
-                              color: Colors.grey[300],
-                              child: const Icon(Icons.broken_image),
-                            );
-                          },
-                        ),
+                    // Headline
+                    Text(
+                      ad.headline,
+                      style: const TextStyle(
+                        fontSize: 14.0,
+                        fontWeight: FontWeight.bold,
                       ),
-
-                    // Spacing
-                    const SizedBox(width: 12),
-
-                    // Ad headline and description
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            ad.headline,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (ad.description.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              ad.description,
-                              style: TextStyle(
-                                color: Colors.grey[800],
-                                fontSize: 14,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ],
-                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 4),
+                    // Description
+                    if (ad.description.isNotEmpty)
+                      Text(
+                        ad.description,
+                        style: TextStyle(
+                          fontSize: 12.0,
+                          color: Colors.grey[800],
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                   ],
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );

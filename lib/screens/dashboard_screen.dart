@@ -387,7 +387,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             // Replace the existing ListView with our modified one that includes ads
             SizedBox(
-              height: 280,
+              height: 180, // Reduced further from 224
               child: _buildNewsListWithAds(news, AdType.inFeedDashboard),
             ),
           ],
@@ -400,8 +400,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildNewsListWithAds(List<Article> articles, AdType adType) {
     final List<Widget> itemsWithAds = [];
-    const int adFrequency =
-        3; // Insert ad after every 3rd article for better visibility
+    const int adFrequency = 3; // Insert ad after every 3rd article
 
     for (int i = 0; i < articles.length; i++) {
       // Add the article
@@ -420,14 +419,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // After every 'adFrequency' articles (and not at the very end), add an ad
       if ((i + 1) % adFrequency == 0 && i < articles.length - 1) {
         itemsWithAds.add(
-          // Style the ad similar to NewsCardMini for consistent appearance
-          Container(
+          // Important: Ensure consistent sizing with news cards
+          SizedBox(
             width: 220, // Match width of news cards
-            margin: const EdgeInsets.symmetric(horizontal: 8.0),
-            // Wrap the ad in a Card that matches NewsCardMini styling
             child: Card(
               elevation: 2,
-              clipBehavior: Clip.antiAlias, // Ensures no overflow
+              clipBehavior: Clip.antiAlias,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
