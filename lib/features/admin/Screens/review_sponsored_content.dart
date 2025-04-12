@@ -541,3 +541,14 @@ class _ReviewSponsoredContentScreenState
 
       ScaffoldMessenger.of(
         context,
+      ).showSnackBar(const SnackBar(content: Text('Event rejected')));
+    } catch (e) {
+      debugPrint('Error: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error rejecting event: $e')));
+    }
+  }
+}
+
+final String example = 'Fix this error';
