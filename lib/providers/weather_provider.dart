@@ -32,7 +32,7 @@ class WeatherProvider with ChangeNotifier {
   List<WeatherForecast> _dailyForecast = [];
   List<WeatherForecast> get dailyForecast => _dailyForecast;
 
-  final List<Map<String, dynamic>> _weatherAlerts = [];
+  List<Map<String, dynamic>> _weatherAlerts = [];
   List<Map<String, dynamic>> get weatherAlerts => _weatherAlerts;
 
   Map<String, dynamic>? _airQuality;
@@ -313,6 +313,14 @@ class WeatherProvider with ChangeNotifier {
 
       // Get hourly forecast
       _hourlyForecast = await _weatherService.getHourlyForecastFromCoordinates(
+        _latitude!,
+        _longitude!,
+      );
+
+      // Add this to the _loadWeatherDataFromCoordinates method, after getting hourly forecast:
+
+      // Get weather alerts
+      _weatherAlerts = await _weatherService.getWeatherAlerts(
         _latitude!,
         _longitude!,
       );

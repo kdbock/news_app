@@ -124,6 +124,9 @@ class _WeatherScreenState extends State<WeatherScreen>
       // Update using city name
       weatherProvider.updateCityName(query);
     }
+
+    // Trigger a refresh of the weather data
+    weatherProvider.refreshWeather();
   }
 
   @override
@@ -597,10 +600,8 @@ class _WeatherScreenState extends State<WeatherScreen>
   }
 
   Widget _buildAlertsTab(WeatherProvider provider) {
-    // This would normally fetch from provider.weatherAlerts or similar
-    // For now, we'll use a placeholder since we don't have full implementation
-    final hasAlerts =
-        false; // This would be determined by checking provider data
+    final alerts = provider.weatherAlerts;
+    final hasAlerts = alerts.isNotEmpty;
 
     return ListView(
       padding: const EdgeInsets.all(16.0),
@@ -634,8 +635,27 @@ class _WeatherScreenState extends State<WeatherScreen>
                 ),
                 const SizedBox(height: 16),
                 if (hasAlerts)
-                  // This would be a ListView of alerts
-                  const Text('List of alerts would appear here')
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: alerts.length,
+                    separatorBuilder: (context, index) => const Divider(),
+                    itemBuilder: (context, index) {
+                      final alert = alerts[index];
+                      return ListTile(
+                        title: Text(
+                          alert['event'] ?? 'Weather Alert',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(alert['headline'] ?? ''),
+                        leading: Icon(
+                          _getAlertIcon(alert['severity'] ?? 'Unknown'),
+                          color: _getAlertColor(alert['severity'] ?? 'Unknown'),
+                        ),
+                        onTap: () => _showAlertDetails(context, alert),
+                      );
+                    },
+                  )
                 else
                   Center(
                     child: Padding(
@@ -664,59 +684,78 @@ class _WeatherScreenState extends State<WeatherScreen>
         const SizedBox(height: 16),
 
         // Weather safety resources
-        Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Weather Safety Resources',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(
-                    Icons.info_outline,
-                    color: Color(0xFFd2982a),
-                  ),
-                  title: const Text('NWS Weather Safety'),
-                  subtitle: const Text(
-                    'Tips and resources from the National Weather Service',
-                  ),
-                  onTap: () => _launchURL('https://www.weather.gov/safety/'),
-                ),
-                ListTile(
-                  leading: const Icon(
-                    Icons.warning_amber,
-                    color: Color(0xFFd2982a),
-                  ),
-                  title: const Text('Active Warnings Map'),
-                  subtitle: const Text('View current warnings on the NWS map'),
-                  onTap: () => _launchURL('https://www.weather.gov/'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.radar, color: Color(0xFFd2982a)),
-                  title: const Text('Weather Radar'),
-                  subtitle: const Text(
-                    'National Weather Service radar imagery',
-                  ),
-                  onTap: () => _launchURL('https://radar.weather.gov/'),
-                ),
-              ],
-            ),
-          ),
-        ),
-
+        // (keep the existing code for this part)
+        // ...
         const SizedBox(height: 16),
-
-        // NWS attribution
         _buildNWSAttribution(),
       ],
+    );
+  }
+
+  IconData _getAlertIcon(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'extreme':
+        return Icons.warning_amber;
+      case 'severe':
+        return Icons.warning;
+      case 'moderate':
+        return Icons.info;
+      case 'minor':
+        return Icons.info_outline;
+      default:
+        return Icons.notification_important;
+    }
+  }
+
+  Color _getAlertColor(String severity) {
+    switch (severity.toLowerCase()) {
+      case 'extreme':
+        return Colors.red;
+      case 'severe':
+        return Colors.orange;
+      case 'moderate':
+        return Colors.yellow.shade800;
+      case 'minor':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  void _showAlertDetails(BuildContext context, Map<String, dynamic> alert) {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text(alert['event'] ?? 'Weather Alert'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (alert['description'] != null &&
+                      alert['description'].isNotEmpty)
+                    Text(alert['description']),
+                  const SizedBox(height: 16),
+                  if (alert['instruction'] != null &&
+                      alert['instruction'].isNotEmpty) ...[
+                    const Text(
+                      'Instructions:',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(alert['instruction']),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
     );
   }
 

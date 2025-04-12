@@ -5,7 +5,7 @@ import 'package:neusenews/widgets/components/section_header.dart';
 class DashboardWeatherWidget extends StatelessWidget {
   final List<WeatherForecast> forecasts;
   final VoidCallback onSeeAllPressed;
-  
+
   const DashboardWeatherWidget({
     super.key,
     required this.forecasts,
@@ -17,19 +17,18 @@ class DashboardWeatherWidget extends StatelessWidget {
     if (forecasts.isEmpty) {
       return Container(); // Return empty container if no forecast data
     }
-    
+
     final currentForecast = forecasts.first;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(
-          title: 'Weather',
-          onSeeAllPressed: onSeeAllPressed,
-        ),
+        SectionHeader(title: 'Weather', onSeeAllPressed: onSeeAllPressed),
         Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -66,11 +65,11 @@ class DashboardWeatherWidget extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          'H: ${currentForecast.highTemp.round()}°',
+                          'H: ${currentForecast.tempMax.round()}°',
                           style: const TextStyle(fontSize: 16),
                         ),
                         Text(
-                          'L: ${currentForecast.lowTemp.round()}°',
+                          'L: ${currentForecast.tempMin.round()}°',
                           style: const TextStyle(fontSize: 16),
                         ),
                       ],
@@ -84,18 +83,20 @@ class DashboardWeatherWidget extends StatelessWidget {
       ],
     );
   }
-  
+
   IconData _getWeatherIcon(String condition) {
     final lowerCondition = condition.toLowerCase();
     if (lowerCondition.contains('clear') || lowerCondition.contains('sunny')) {
       return Icons.wb_sunny;
     } else if (lowerCondition.contains('cloud')) {
       return Icons.cloud;
-    } else if (lowerCondition.contains('rain') || lowerCondition.contains('shower')) {
+    } else if (lowerCondition.contains('rain') ||
+        lowerCondition.contains('shower')) {
       return Icons.beach_access;
     } else if (lowerCondition.contains('snow')) {
       return Icons.ac_unit;
-    } else if (lowerCondition.contains('storm') || lowerCondition.contains('thunder')) {
+    } else if (lowerCondition.contains('storm') ||
+        lowerCondition.contains('thunder')) {
       return Icons.flash_on;
     } else {
       return Icons.cloud;
