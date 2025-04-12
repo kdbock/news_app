@@ -146,6 +146,83 @@ class _InvestorDashboardScreenState extends State<InvestorDashboardScreen> {
     }
   }
 
+  Future<void> _createTestData() async {
+    try {
+      final firestore = FirebaseFirestore.instance;
+
+      // Create the latest investor dashboard document
+      await firestore.collection('investorDashboard').doc('latest').set({
+        'lastUpdated': Timestamp.now(),
+        'monthlyActiveUsers': 1250,
+        'totalAppDownloads': 5400,
+        'totalArticles': 842,
+        'totalSponsored': 58,
+        'monthlyRevenue': 8750.50,
+        'yearToDateRevenue': 52300.75,
+        'projectedAnnual': 105000.00,
+        'userGrowthRate': 12.5,
+        'revenueGrowthRate': 8.3,
+        'revenueHistory': List.generate(
+          12,
+          (i) => {
+            'month': i + 1,
+            'value': 4000.0 + (i * 400.0 + (i.isEven ? 200 : -200)),
+          },
+        ),
+        'userGrowthHistory': List.generate(
+          12,
+          (i) => {'month': i + 1, 'value': 800.0 + (i * 50.0)},
+        ),
+      });
+
+      // Create sample reports
+      final reportTypes = [
+        'financial',
+        'user',
+        'content',
+        'quarterly',
+        'general',
+      ];
+      final reportTitles = [
+        'Q1 2025 Financial Summary',
+        'User Acquisition Report',
+        'Content Performance Analysis',
+        'Quarterly Business Review',
+        'Annual Projections',
+      ];
+
+      for (var i = 0; i < 5; i++) {
+        await firestore.collection('investorReports').add({
+          'title': reportTitles[i],
+          'publishedAt': Timestamp.fromDate(
+            DateTime.now().subtract(Duration(days: i * 15)),
+          ),
+          'type': reportTypes[i],
+          'fileUrl': 'https://example.com/reports/sample-${i + 1}.pdf',
+        });
+      }
+
+      // Make current user an investor if not already
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await firestore.collection('users').doc(user.uid).update({
+          'isInvestor': true,
+        });
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Test data created successfully!')),
+      );
+
+      // Reload data
+      _loadInvestorData();
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error creating test data: $e')));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

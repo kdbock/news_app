@@ -280,8 +280,7 @@ class EventCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          event.startTime ??
-                              DateFormat('h:mm a').format(event.eventDate),
+                          event.startTime,
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[700],

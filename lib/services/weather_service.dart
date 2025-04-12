@@ -677,75 +677,7 @@ class WeatherService {
     }
   }
 
-  // Add this helper method
-  Future<List<Map<String, dynamic>>> _getAlertsByZone(
-    double lat,
-    double lon,
-  ) async {
-    try {
-      // Get zone info first
-      final pointsUrl = '$weatherGovBaseUrl/points/$lat,$lon';
-      final pointsResponse = await http
-          .get(Uri.parse(pointsUrl), headers: _weatherGovHeaders)
-          .timeout(const Duration(seconds: 5));
 
-      if (pointsResponse.statusCode == 200) {
-        final pointsData = json.decode(pointsResponse.body);
-        final county = pointsData['properties']['county'];
-
-        if (county != null) {
-          final countyResponse = await http
-              .get(Uri.parse(county), headers: _weatherGovHeaders)
-              .timeout(const Duration(seconds: 5));
-
-          if (countyResponse.statusCode == 200) {
-            final countyData = json.decode(countyResponse.body);
-            final String zoneId = countyData['properties']['id'];
-
-            final zoneAlertsUrl =
-                '$weatherGovBaseUrl/alerts/active/zone/$zoneId';
-            final zoneResponse = await http
-                .get(Uri.parse(zoneAlertsUrl), headers: _weatherGovHeaders)
-                .timeout(const Duration(seconds: 5));
-
-            if (zoneResponse.statusCode == 200) {
-              final zoneData = json.decode(zoneResponse.body);
-              final features = zoneData['features'] ?? [];
-              debugPrint('Found ${features.length} alerts via zone query');
-              return _parseAlerts(features);
-            }
-          }
-        }
-      }
-      return [];
-    } catch (e) {
-      debugPrint('Error in zone alerts: $e');
-      return [];
-    }
-  }
-
-  // Add this helper method to parse alerts consistently
-  List<Map<String, dynamic>> _parseAlerts(List<dynamic> features) {
-    return features.map<Map<String, dynamic>>((alert) {
-      final properties = alert['properties'];
-      return {
-        'event': properties['event'] ?? 'Weather Alert',
-        'headline': properties['headline'] ?? 'Weather Alert',
-        'description': properties['description'] ?? '',
-        'severity': properties['severity'] ?? 'Unknown',
-        'urgency': properties['urgency'] ?? 'Unknown',
-        'effective':
-            properties['effective'] != null
-                ? DateTime.parse(properties['effective']).toString()
-                : DateTime.now().toString(),
-        'expires':
-            properties['expires'] != null
-                ? DateTime.parse(properties['expires']).toString()
-                : DateTime.now().add(Duration(hours: 24)).toString(),
-        'instruction': properties['instruction'] ?? '',
-      };
-    }).toList();
-  }
 
   Future<List<Map<String, dynamic>>> getWeatherAlerts(
     double lat,

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:neusenews/features/advertising/widgets/ad_performance_chart.dart';
-import 'package:neusenews/features/advertising/widgets/audience_breakdown_widget.dart';
-import 'package:neusenews/features/advertising/widgets/conversion_metrics_widget.dart';
-import 'package:neusenews/features/advertising/widgets/roi_calculator_widget.dart';
+import 'package:neusenews/features/advertising/widgets/ad_analytics_dashboard.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AdAnalyticsScreen extends StatelessWidget {
   const AdAnalyticsScreen({super.key});
@@ -20,13 +18,16 @@ class AdAnalyticsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const AdPerformanceChart(),
-            const SizedBox(height: 24),
-            const AudienceBreakdownWidget(),
-            const SizedBox(height: 24),
-            const ConversionMetricsWidget(),
-            const SizedBox(height: 24),
-            const RoiCalculatorWidget(),
+            // Replace all individual widgets with the unified dashboard
+            AdAnalyticsDashboard(
+              // Get the current user's business ID
+              businessId: FirebaseAuth.instance.currentUser?.uid,
+              // Show all dashboard components
+              showPerformanceChart: true,
+              showAudienceBreakdown: true,
+              showConversionMetrics: true,
+              showRoiCalculator: true,
+            ),
           ],
         ),
       ),

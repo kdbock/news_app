@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:neusenews/features/advertising/models/ad_view.dart';
+import 'package:neusenews/features/advertising/repositories/ad_repository.dart';
 
 import '../models/ad.dart';
 import '../models/ad_type.dart';
@@ -330,6 +332,50 @@ class AdRepository {
       // This approach avoids creating duplicate ads on every app restart
     } catch (e) {
       debugPrint('Error creating debug ads: $e');
+    }
+  }
+
+  // Methods to add to your AdRepository class:
+
+  Future<List<String>> getUserInterests(String userId) async {
+    // In a real implementation, you would query a user's interests
+    // For now, return some default interests
+    return ['local news', 'sports', 'community'];
+  }
+
+  Future<List<AdView>> fetchRecentlyViewedAdsByUser(
+    String userId,
+    AdType type,
+  ) async {
+    // This would fetch from Firestore or another database
+    // For now, return an empty list
+    return [];
+  }
+
+  Future<List<AdView>> getRecentlyViewedAdsByUser(
+    String userId,
+    AdType type,
+  ) async {
+    try {
+      // In a real implementation, you would query Firestore
+      // For now, return empty list since we don't have actual view tracking yet
+      return [];
+
+      /* 
+      // Real implementation would look like this:
+      final snapshot = await FirebaseFirestore.instance
+          .collection('adViews')
+          .where('userId', isEqualTo: userId)
+          .where('adType', isEqualTo: type.index)
+          .orderBy('viewedAt', descending: true)
+          .limit(100)
+          .get();
+      
+      return snapshot.docs.map((doc) => AdView.fromFirestore(doc.data())).toList();
+      */
+    } catch (e) {
+      debugPrint('Error fetching ad views: $e');
+      return [];
     }
   }
 }

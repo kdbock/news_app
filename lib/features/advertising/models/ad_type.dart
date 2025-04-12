@@ -1,9 +1,9 @@
 enum AdType {
-  titleSponsor, // 0 - Banner at the top of the homepage
-  bannerAd, // 1 - Banner ad in various sections
-  inFeedNews, // 2 - Ad within category-specific news feeds
-  weather, // 3 - Sponsor banner in the weather section
-  inFeedDashboard, // 4 - Ad within the main dashboard feed
+  titleSponsor, // 0
+  inFeedDashboard, // 1
+  inFeedNews, // 2
+  weather, // 3
+  bannerAd, // 4
 }
 
 extension AdTypeExtension on AdType {

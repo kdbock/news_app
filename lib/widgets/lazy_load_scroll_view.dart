@@ -87,7 +87,7 @@ class _LazyLoadScrollViewState extends State<LazyLoadScrollView> {
             return CustomScrollView(
               controller: _controller,
               slivers: [
-                ...scrollView.buildSlivers(context),
+                SliverToBoxAdapter(child: scrollView),
                 if (_isLoading)
                   const SliverToBoxAdapter(
                     child: Padding(

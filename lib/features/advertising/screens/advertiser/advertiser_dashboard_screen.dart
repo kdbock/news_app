@@ -7,6 +7,7 @@ import 'package:neusenews/features/advertising/models/ad_status.dart';
 import 'package:neusenews/widgets/app_drawer.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:neusenews/features/advertising/screens/advertiser/ad_creation_screen.dart';
+import 'package:neusenews/features/advertising/widgets/ad_analytics_dashboard.dart';
 
 class AdvertiserDashboardScreen extends StatefulWidget {
   const AdvertiserDashboardScreen({super.key});
@@ -268,40 +269,14 @@ class _AdvertiserDashboardScreenState extends State<AdvertiserDashboardScreen>
 
             const SizedBox(height: 24),
 
-            // Performance chart
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Monthly Performance',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Last 6 months',
-                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(height: 250, child: _buildPerformanceChart()),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildChartLegend(Colors.blue, 'Impressions'),
-                        const SizedBox(width: 24),
-                        _buildChartLegend(Colors.red, 'Clicks'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+            // Replace multiple separate widgets with the unified dashboard
+            AdAnalyticsDashboard(
+              businessId: _auth.currentUser?.uid,
+              // Customize which sections to show
+              showRoiCalculator: true,
+              showPerformanceChart: true,
+              showAudienceBreakdown: true,
+              showConversionMetrics: true,
             ),
 
             const SizedBox(height: 24),

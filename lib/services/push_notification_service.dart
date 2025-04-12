@@ -9,7 +9,6 @@ import 'dart:convert';
 
 import 'package:neusenews/navigation/navigation_service.dart';
 import 'package:neusenews/navigation/routes.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -324,46 +323,7 @@ class PushNotificationService {
   }
 
   // Handle when user taps on notification to open app
-  void _handleMessageOpenedApp(RemoteMessage message) {
-    developer.log('Message opened app: ${message.messageId}');
-    _navigateBasedOnNotification(message.data);
-  }
 
-  // Show local notification
-  Future<void> _showLocalNotification({
-    required int id,
-    required String title,
-    required String body,
-    String? payload,
-  }) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'neusenews_channel',
-          'Neuse News Notifications',
-          channelDescription: 'Notifications from Neuse News',
-          importance: Importance.high,
-          priority: Priority.high,
-        );
-
-    const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const NotificationDetails platformDetails = NotificationDetails(
-      android: androidDetails,
-      iOS: iOSDetails,
-    );
-
-    await _localNotifications.show(
-      id,
-      title,
-      body,
-      platformDetails,
-      payload: payload,
-    );
-  }
 
   // Handle notification tap from local notification
   void _handleNotificationTap(String? payload) {
@@ -556,10 +516,6 @@ class PushNotificationService {
   }
 
   // Add to your PushNotificationService class
-  Future<bool> _checkConnectivity() async {
-    var connectivityResult = await Connectivity().checkConnectivity();
-    return connectivityResult != ConnectivityResult.none;
-  }
 }
 
 // This must be a top-level function

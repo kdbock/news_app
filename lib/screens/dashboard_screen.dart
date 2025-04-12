@@ -8,6 +8,7 @@ import 'package:neusenews/providers/news_provider.dart';
 import 'package:neusenews/providers/weather_provider.dart';
 import 'package:neusenews/services/connectivity_service.dart';
 import 'package:neusenews/widgets/news_card_mini.dart';
+import 'package:neusenews/widgets/news_card.dart'; // Add this import for NewsCard
 import 'package:neusenews/widgets/dashboard/dashboard_weather_widget.dart';
 import 'package:neusenews/widgets/category_navigation_bar.dart';
 import 'package:neusenews/widgets/bottom_nav_bar.dart';
@@ -15,6 +16,11 @@ import 'package:neusenews/services/news_service.dart';
 import 'package:neusenews/widgets/dashboard/dashboard_sponsored_article.dart';
 import 'package:neusenews/providers/events_provider.dart'; // Ensure this is the correct path
 import 'package:neusenews/widgets/dashboard/dashboard_event.dart'; // Add this import
+// Add this import for the title sponsor banner
+import 'package:neusenews/features/advertising/widgets/title_sponsor_banner.dart';
+// Add this import at the top with your other imports
+import 'package:neusenews/features/advertising/widgets/in_feed_ad_banner.dart';
+import 'package:neusenews/features/advertising/models/ad_type.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -24,7 +30,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final NewsService _newsService = NewsService();
   int _selectedIndex = 0;
   bool _isRefreshing = false;
   bool _isInitialized = false;
@@ -70,31 +75,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } finally {
       if (mounted) {
         setState(() => _isInitialized = true);
-      }
-    }
-  }
-
-  Future<void> _refreshData() async {
-    if (_isRefreshing) return;
-
-    setState(() => _isRefreshing = true);
-
-    try {
-      final newsProvider = Provider.of<NewsProvider>(context, listen: false);
-      final weatherProvider = Provider.of<WeatherProvider>(
-        context,
-        listen: false,
-      );
-
-      await Future.wait([
-        newsProvider.refreshAllData(),
-        weatherProvider.refreshWeather(),
-      ]);
-    } catch (e) {
-      debugPrint('Error refreshing: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _isRefreshing = false);
       }
     }
   }
@@ -193,6 +173,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Navigator.pushNamed(context, category.route);
             },
           ),
+          // Title sponsor banner (existing)
+          const TitleSponsorBanner(),
           Consumer<WeatherProvider>(
             builder: (context, weatherProvider, _) {
               final forecasts = weatherProvider.getDashboardForecast();
@@ -375,51 +357,93 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildNewsSection({
-    required List<Article> Function(NewsProvider) newsSelector,
+    required Function(NewsProvider) newsSelector,
     required String title,
     required String categoryKey,
   }) {
     return Consumer<NewsProvider>(
-      builder: (context, provider, _) {
-        final articles = newsSelector(provider);
+      builder: (context, newsProvider, _) {
+        final news = newsSelector(newsProvider);
+        if (news.isEmpty) return const SizedBox.shrink();
 
-        if (articles.isEmpty && provider.isInitialized) {
-          return const SizedBox.shrink();
-        }
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: SectionHeader(
-                  title: title,
-                  onSeeAllPressed: () {
-                    Navigator.pushNamed(context, '/news/$categoryKey');
-                  },
-                ),
+        // Here's where we'll modify to insert ads
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Section header remains the same
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
+              child: Row(
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleLarge),
+                  const Spacer(),
+                  TextButton(
+                    onPressed:
+                        () => Navigator.pushNamed(context, '/$categoryKey'),
+                    child: const Text('See All'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 210,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  itemCount: articles.length,
-                  itemBuilder: (context, index) {
-                    return NewsCardMini(
-                      article: articles[index],
-                      onTap: () => _openArticle(articles[index]),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+            ),
+            // Replace the existing ListView with our modified one that includes ads
+            SizedBox(
+              height: 280,
+              child: _buildNewsListWithAds(news, AdType.inFeedDashboard),
+            ),
+          ],
         );
       },
+    );
+  }
+
+  // Add this method to your _DashboardScreenState class
+
+  Widget _buildNewsListWithAds(List<Article> articles, AdType adType) {
+    final List<Widget> itemsWithAds = [];
+    const int adFrequency =
+        3; // Insert ad after every 3rd article for better visibility
+
+    for (int i = 0; i < articles.length; i++) {
+      // Add the article
+      itemsWithAds.add(
+        NewsCardMini(
+          article: articles[i],
+          onTap:
+              () => Navigator.pushNamed(
+                context,
+                '/article',
+                arguments: articles[i],
+              ),
+        ),
+      );
+
+      // After every 'adFrequency' articles (and not at the very end), add an ad
+      if ((i + 1) % adFrequency == 0 && i < articles.length - 1) {
+        itemsWithAds.add(
+          // Style the ad similar to NewsCardMini for consistent appearance
+          Container(
+            width: 220, // Match width of news cards
+            margin: const EdgeInsets.symmetric(horizontal: 8.0),
+            // Wrap the ad in a Card that matches NewsCardMini styling
+            child: Card(
+              elevation: 2,
+              clipBehavior: Clip.antiAlias, // Ensures no overflow
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const InFeedAdBanner(adType: AdType.inFeedDashboard),
+            ),
+          ),
+        );
+        debugPrint('[Dashboard] Inserted ad after article ${i + 1}');
+      }
+    }
+
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
+      itemCount: itemsWithAds.length,
+      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+      itemBuilder: (context, index) => itemsWithAds[index],
     );
   }
 }

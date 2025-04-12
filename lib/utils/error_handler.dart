@@ -53,8 +53,7 @@ class AppErrorHandler {
       case ErrorType.auth:
         return 'Your session has expired. Please log in again.';
       case ErrorType.unknown:
-      default:
-        return 'Something went wrong. Please try again.';
+        return 'An unexpected error occurred. Please try again later.';
     }
   }
   

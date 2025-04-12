@@ -5,6 +5,8 @@ import 'package:neusenews/features/advertising/models/ad.dart';
 import 'package:neusenews/features/advertising/models/ad_type.dart';
 import 'package:neusenews/features/advertising/models/ad_status.dart';
 import 'package:neusenews/features/advertising/repositories/ad_repository.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:neusenews/features/advertising/models/ad_view.dart';
 
 class AdService {
   final AdRepository repository;
@@ -41,20 +43,24 @@ class AdService {
   }
 
   // Record ad impression
-  Future<void> recordImpression(String adId) async {
+  void recordImpression(String adId) {
     try {
-      await repository.recordImpression(adId);
+      FirebaseFirestore.instance.collection('ads').doc(adId).update({
+        'impressions': FieldValue.increment(1),
+      });
     } catch (e) {
-      debugPrint('Error recording impression: $e');
+      debugPrint("Error recording impression: $e");
     }
   }
 
   // Record ad click
   Future<void> recordClick(String adId) async {
     try {
-      await repository.recordClick(adId);
+      await FirebaseFirestore.instance.collection('ads').doc(adId).update({
+        'clicks': FieldValue.increment(1),
+      });
     } catch (e) {
-      debugPrint('Error recording click: $e');
+      debugPrint("Error recording click: $e");
     }
   }
 
@@ -145,6 +151,86 @@ class AdService {
       // Create minimal debug ads code here...
     } catch (e) {
       debugPrint('Error checking for ads: $e');
+    }
+  }
+
+  // Ad targeting functionality
+  Future<List<Ad>> getPersonalizedAdsForUser(String userId, AdType type) async {
+    try {
+      // Get user's recent article views/interactions from repository
+      final userInterests = await repository.getUserInterests(userId);
+
+      // Get active ads of the specified type
+      final ads = await getActiveAdsByTypeOnce(type);
+
+      // Sort ads based on relevance to user interests
+      if (userInterests.isNotEmpty) {
+        ads.sort((a, b) {
+          final aRelevance = _calculateRelevanceScore(a, userInterests);
+          final bRelevance = _calculateRelevanceScore(b, userInterests);
+          return bRelevance.compareTo(aRelevance); // Higher score first
+        });
+      }
+
+      return ads;
+    } catch (e) {
+      debugPrint('Error getting personalized ads: $e');
+      // Fallback to regular ads if personalization fails
+      return getActiveAdsByTypeOnce(type);
+    }
+  }
+
+  // Helper method to calculate ad relevance
+  double _calculateRelevanceScore(Ad ad, List<String> interests) {
+    // Simple relevance calculation - count matching keywords
+    double score = 0;
+
+    final adText =
+        '${ad.headline} ${ad.description} ${ad.businessName}'.toLowerCase();
+
+    for (final interest in interests) {
+      if (adText.contains(interest.toLowerCase())) {
+        score += 1.0;
+      }
+    }
+
+    return score;
+  }
+
+  // Ad serving functionality
+  Future<Ad?> getNextAdForDisplay(String userId, AdType type) async {
+    try {
+      // Get active ads of the requested type
+      final availableAds = await getActiveAdsByTypeOnce(type);
+
+      if (availableAds.isEmpty) return null;
+
+      // For now, we'll simplify this by just returning a random ad
+      // Later you can implement full frequency capping with viewedAds
+      return availableAds[DateTime.now().millisecondsSinceEpoch %
+          availableAds.length];
+
+      /* Original implementation to restore later:
+      // Get recently viewed ads by this user
+      final List<AdView> viewedAds = await repository.getRecentlyViewedAdsByUser(userId, type);
+      
+      // Apply frequency capping - don't show same ad more than 3 times in 24 hours
+      final adIdsViewedRecently = viewedAds
+          .where((ad) => ad.viewedAt.isAfter(DateTime.now().subtract(const Duration(hours: 24))))
+          .fold<Map<String, int>>({}, (map, ad) {
+            map[ad.adId] = (map[ad.adId] ?? 0) + 1;
+            return map;
+          });
+      
+      // Filter out ads that have been viewed 3+ times in last 24 hours
+      final eligibleAds = availableAds.where((ad) {
+        final viewCount = adIdsViewedRecently[ad.id] ?? 0;
+        return viewCount < 3;
+      }).toList();
+      */
+    } catch (e) {
+      debugPrint('Error getting next ad for display: $e');
+      return null;
     }
   }
 }

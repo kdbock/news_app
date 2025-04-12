@@ -10,7 +10,6 @@ import 'package:flutter/widgets.dart';
 import 'dart:io';
 import 'dart:async'; // Add this import for TimeoutException
 // Add these missing imports
-import 'package:xml/xml.dart';
 import 'package:intl/intl.dart';
 
 class NewsService {
@@ -93,7 +92,7 @@ class NewsService {
         final List<Article> articles = [];
 
         try {
-          final channel = RssFeed.parse(response.body).items;
+          final channel = RssFeed.parse(response.body).items ?? [];
 
           for (final item in channel ?? []) {
             // Extract article data
@@ -343,6 +342,7 @@ class NewsService {
   int min(int a, int b) => a < b ? a : b;
 
   // Helper method to categorize a list of articles
+  // TODO: This method is currently unused but will be used for future categorization feature
   Future<void> _categorizeArticles(List<Article> articles) async {
     // Process articles in batches to avoid excessive processing
     const int batchSize = 5;
@@ -540,6 +540,7 @@ class NewsService {
   }
 
   // Add the following method to replace the dns_client functionality
+  // TODO: This method is currently unused but will be needed for DNS resolution improvements
   Future<String> _resolveHostIP(String hostname) async {
     try {
       // Try direct system DNS lookup first
@@ -568,141 +569,7 @@ class NewsService {
   // Add these methods to your NewsService class
 
   // Parse RSS feed XML content into Articles
-  List<Article> _parseRssFeed(String xmlString) {
-    try {
-      debugPrint('Parsing RSS feed content (${xmlString.length} bytes)');
-
-      // Simple validation check
-      if (!xmlString.contains('<rss') && !xmlString.contains('<feed')) {
-        debugPrint('XML content does not appear to be an RSS feed');
-        return [];
-      }
-
-      final document = XmlDocument.parse(xmlString);
-      final items = document.findAllElements('item');
-
-      if (items.isEmpty) {
-        debugPrint('No <item> elements found in feed');
-        return [];
-      }
-
-      debugPrint('Found ${items.length} items in feed');
-
-      final articles = <Article>[];
-
-      for (final item in items) {
-        try {
-          // Extract fields with null-safety
-          final title = _getElementText(item, 'title') ?? 'No Title';
-          final link = _getElementText(item, 'link') ?? '';
-          final description = _getElementText(item, 'description') ?? '';
-          final authorElement =
-              _getElementText(item, 'dc:creator') ??
-              _getElementText(item, 'author') ??
-              'Unknown';
-          final pubDateStr =
-              _getElementText(item, 'pubDate') ??
-              'Sun, 06 Apr 2025 09:28:00 +0000';
-
-          // Extract categories
-          final categoryElements = item.findElements('category');
-          final categories =
-              categoryElements
-                  .map((e) => e.text.trim())
-                  .where((c) => c.isNotEmpty)
-                  .toList();
-
-          // Parse publish date with fallback
-          DateTime publishDate;
-          try {
-            publishDate =
-                pubDateStr.isNotEmpty
-                    ? DateFormat(
-                      'EEE, dd MMM yyyy HH:mm:ss Z',
-                    ).parse(pubDateStr)
-                    : DateTime.now();
-          } catch (e) {
-            publishDate = DateTime.now();
-          }
-
-          // Extract image URL from media:content or enclosure
-          String imageUrl = '';
-          final mediaContent = item.findElements('media:content');
-          if (mediaContent.isNotEmpty) {
-            imageUrl = mediaContent.first.getAttribute('url') ?? '';
-          }
-
-          if (imageUrl.isEmpty) {
-            final enclosures = item.findElements('enclosure');
-            if (enclosures.isNotEmpty) {
-              final type = enclosures.first.getAttribute('type') ?? '';
-              if (type.startsWith('image/')) {
-                imageUrl = enclosures.first.getAttribute('url') ?? '';
-              }
-            }
-          }
-
-          // Extract image from description as a fallback
-          if (imageUrl.isEmpty && description.contains('<img')) {
-            final imgRegex = RegExp(r'<img[^>]+src="([^">]+)"');
-            final match = imgRegex.firstMatch(description);
-            if (match != null) {
-              imageUrl = match.group(1) ?? '';
-            }
-          }
-
-          // Clean up description (remove HTML)
-          final cleanDescription =
-              description
-                  .replaceAll(RegExp(r'<[^>]*>'), '')
-                  .replaceAll('&nbsp;', ' ')
-                  .trim();
-
-          // Create article
-          final article = Article(
-            id:
-                link.isNotEmpty
-                    ? Uri.encodeFull(link).hashCode.toString()
-                    : DateTime.now().millisecondsSinceEpoch.toString(),
-            title: title,
-            author: authorElement,
-            content: cleanDescription,
-            excerpt:
-                cleanDescription.length > 150
-                    ? '${cleanDescription.substring(0, 150)}...'
-                    : cleanDescription,
-            imageUrl: imageUrl,
-            publishDate: publishDate,
-            url: link,
-            primaryCategory: categories.isNotEmpty ? categories.first : null,
-            categories: categories,
-          );
-
-          articles.add(article);
-        } catch (e) {
-          debugPrint('Error parsing RSS item: $e');
-        }
-      }
-
-      return articles;
-    } catch (e) {
-      debugPrint('Error parsing RSS feed: $e');
-      return [];
-    }
-  }
-
-  // Helper to safely get element text
-  String? _getElementText(XmlElement parent, String elementName) {
-    try {
-      final elements = parent.findElements(elementName);
-      if (elements.isNotEmpty) {
-        return elements.first.text.trim();
-      }
-    } catch (e) {
-      // Ignore errors
-    }
-    return null;
-  }
+  // Removed unused method '_parseRssFeed' as it was not referenced anywhere in the code.
 
   // Helper method to extract image URL from RSS item
   String _extractImageUrl(RssItem item) {
@@ -733,35 +600,6 @@ class NewsService {
     return '';
   }
 
-  // Add helper method to generate sample articles when all else fails
-  List<Article> _generateSampleArticles(int count) {
-    return List.generate(
-      count,
-      (index) => Article(
-        id: 'sample-$index',
-        title: 'Sample Article $index',
-        author: 'Neuse News',
-        content:
-            'This is a sample article generated when content could not be loaded. Please check your internet connection or try again later.',
-        excerpt:
-            'This is a sample article generated when content could not be loaded.',
-        imageUrl: 'https://via.placeholder.com/300x200?text=News',
-        publishDate: DateTime.now().subtract(Duration(hours: index)),
-        url: 'https://www.neusenews.com',
-        categories: ['Sample'],
-        primaryCategory: 'Sample',
-      ),
-    );
-  }
-
-  // Add this to weather_service.dart for proper Weather.gov headers
-  Map<String, String> _getWeatherGovHeaders() {
-    return {
-      'User-Agent': '(Neuse News App, contact@neusenews.com)',
-      'Accept': 'application/geo+json',
-    };
-  }
-
   // Add this method to the NewsService class
   Article _convertRssItemToArticle(RssItem item) {
     // Extract data from RSS item
@@ -787,7 +625,7 @@ class NewsService {
         categories.add(category.value!);
       }
     }
-  
+
     return Article(
       id: link.hashCode.toString(),
       title: title,

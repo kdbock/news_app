@@ -7,14 +7,14 @@ import 'package:neusenews/di/service_locator.dart';
 import 'package:neusenews/features/advertising/repositories/ad_repository.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class TitleSponsorBanner extends StatefulWidget {
-  const TitleSponsorBanner({super.key});
+class WeatherTitleSponsor extends StatefulWidget {
+  const WeatherTitleSponsor({super.key});
 
   @override
-  State<TitleSponsorBanner> createState() => TitleSponsorBannerState();
+  State<WeatherTitleSponsor> createState() => _WeatherTitleSponsorState();
 }
 
-class TitleSponsorBannerState extends State<TitleSponsorBanner> {
+class _WeatherTitleSponsorState extends State<WeatherTitleSponsor> {
   late final AdService _adService;
 
   @override
