@@ -383,6 +383,9 @@ class _ReviewSponsoredContentScreenState
 
       if (reason == null) return; // User canceled
 
+      // Add mounted check
+      if (!mounted) return;
+
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -441,6 +444,9 @@ class _ReviewSponsoredContentScreenState
       );
 
       if (confirm != true) return;
+
+      // Check if still mounted before proceeding
+      if (!mounted) return;
 
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
@@ -511,6 +517,9 @@ class _ReviewSponsoredContentScreenState
 
       if (reason == null) return; // User canceled
 
+      // Add mounted check
+      if (!mounted) return;
+
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -528,15 +537,7 @@ class _ReviewSponsoredContentScreenState
       });
 
       // Notify success
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Event rejected')));
-      }
-    } catch (e) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error rejecting event: $e')));
-    }
-  }
-}
