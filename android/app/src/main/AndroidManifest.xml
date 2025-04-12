@@ -19,7 +19,8 @@
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true"
         android:requestLegacyExternalStorage="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar"> <!-- Add this line for storage access -->
+        android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+        android:networkSecurityConfig="@xml/network_security_config"> <!-- Add this line for storage access -->
         <activity
             android:name=".MainActivity"
             android:exported="true"

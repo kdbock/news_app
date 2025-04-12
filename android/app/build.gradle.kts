@@ -3,6 +3,7 @@ plugins {
     id("kotlin-android")
     // Add Firebase plugin
     id("com.google.gms.google-services")
+    id("com.google.firebase.crashlytics")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -73,7 +74,7 @@ dependencies {
     // Add the Firebase BoM
     implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
     // Add desugar tools
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     // Add AppCompat dependency for Stripe
     implementation("androidx.appcompat:appcompat:1.6.1")
     

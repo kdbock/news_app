@@ -2,9 +2,6 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-
-// Updated imports for the new organizational structure
-// Settings screen remains in core screens
 import 'package:neusenews/providers/auth_provider.dart' as app_auth;
 
 class AppDrawer extends StatelessWidget {
@@ -70,9 +67,7 @@ class AppDrawer extends StatelessWidget {
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(
-                0xFF2d2c31,
-              ), // Changed to dark gray for more professional look
+              color: const Color(0xFF2d2c31),
               borderRadius: BorderRadius.circular(8),
             ),
             child: ListTile(
@@ -111,9 +106,7 @@ class AppDrawer extends StatelessWidget {
           ListTile(
             leading: const Icon(
               Icons.tips_and_updates,
-              color: Color(
-                0xFF2d2c31,
-              ), // Changed to dark gray for more professional look
+              color: Color(0xFF2d2c31),
             ),
             title: const Text('Submit News Tip'),
             onTap: () {
@@ -159,8 +152,7 @@ class AppDrawer extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color:
-                      Colors.grey, // Changed to grey for more professional look
+                  color: Colors.grey,
                 ),
               ),
             ),
@@ -184,8 +176,7 @@ class AppDrawer extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color:
-                      Colors.grey, // Changed to grey for more professional look
+                  color: Colors.grey,
                 ),
               ),
             ),
@@ -209,8 +200,7 @@ class AppDrawer extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color:
-                      Colors.grey, // Changed to grey for more professional look
+                  color: Colors.grey,
                 ),
               ),
             ),

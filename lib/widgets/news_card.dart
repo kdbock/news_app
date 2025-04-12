@@ -1,157 +1,121 @@
 import 'package:flutter/material.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:neusenews/models/article.dart';
-import 'package:transparent_image/transparent_image.dart';
+import 'package:neusenews/repositories/bookmarks_repository.dart';
+import 'package:provider/provider.dart';
 
 class NewsCard extends StatelessWidget {
   final Article article;
   final VoidCallback onReadMore;
-  final String? sourceTag; // Add this parameter
-
+  final bool showBookmarkButton;
+  final String? sourceTag; // Add the missing parameter
+  
   const NewsCard({
     super.key,
     required this.article,
     required this.onReadMore,
-    this.sourceTag, // Optional source tag
+    this.showBookmarkButton = false,
+    this.sourceTag, // Add parameter with default value of null
   });
-
+  
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      clipBehavior: Clip.antiAlias, // Ensures nothing overflows the card
+      elevation: 2,
+      margin: EdgeInsets.zero,
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image box with overlaid title
-          Stack(
-            children: [
-              // Featured image
-              Hero(
-                tag: article.imageUrl,
-                child: FadeInImage.memoryNetwork(
-                  placeholder: kTransparentImage,
-                  image: article.imageUrl,
-                  fit: BoxFit.cover,
-                  height: 150,
-                  width: double.infinity,
-                  fadeInDuration: const Duration(milliseconds: 300),
-                  imageErrorBuilder:
-                      (context, error, stackTrace) => Container(
-                        height: 150,
-                        color: Colors.grey.shade200,
-                        child: const Icon(Icons.broken_image, size: 40),
-                      ),
-                ),
+          // Article image
+          if (article.imageUrl.isNotEmpty)
+            Image.network(
+              article.imageUrl,
+              width: double.infinity,
+              height: 180,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                height: 180,
+                color: Colors.grey[300],
+                child: const Icon(Icons.image_not_supported, size: 50),
               ),
-
-              // Title overlay (covers bottom half of image)
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        Colors.black.withAlpha(
-                          204,
-                        ), // Changed from withOpacity(0.8)
-                        Colors.transparent,
-                      ],
-                      stops: const [0.0, 1.0],
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Source tag if provided (now on the image)
-                      if (sourceTag != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          margin: const EdgeInsets.only(bottom: 6),
-                          decoration: BoxDecoration(
-                            color: _getSourceColor(sourceTag!),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            sourceTag!,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-
-                      // Article title on the image
-                      Text(
-                        article.title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          height: 1.3,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-
-                      // Publication date
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4),
-                        child: Text(
-                          _formatDate(article.publishDate),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ),
-                    ],
+            ),
+          
+          // Source tag chip (if provided)
+          if (sourceTag != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0, top: 16.0, right: 16.0, bottom: 0),
+              child: Chip(
+                label: Text(
+                  sourceTag!,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white,
                   ),
                 ),
+                backgroundColor: const Color(0xFFd2982a),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
               ),
-            ],
-          ),
-
-          // Actions row at the bottom
+            ),
+          
+          // Article content
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Share button
-                TextButton.icon(
-                  onPressed: () {
-                    Share.share(
-                      '${article.title}\n\nRead more: ${article.url}', // Changed from article.link
-                      subject: article.title,
-                    );
-                  },
-                  icon: const Icon(Icons.share, size: 18),
-                  label: const Text('Share'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.grey[700],
-                    padding: EdgeInsets.zero,
+                Text(
+                  article.title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-
-                // Read More button
-                TextButton(
-                  onPressed: onReadMore,
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFFd2982a),
-                    padding: EdgeInsets.zero,
-                  ),
-                  child: const Text('READ MORE'),
+                const SizedBox(height: 8),
+                Text(
+                  article.excerpt,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 16),
+                
+                // Action row with bookmark button (if enabled)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'By ${article.author}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ),
+                    
+                    // Show bookmark button if requested
+                    if (showBookmarkButton)
+                      Consumer<BookmarksRepository>(
+                        builder: (context, repo, _) {
+                          final isBookmarked = repo.isBookmarked(article.id);
+                          return IconButton(
+                            icon: Icon(
+                              isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                              color: isBookmarked ? const Color(0xFFd2982a) : Colors.grey,
+                            ),
+                            onPressed: () => repo.toggleBookmark(article),
+                          );
+                        },
+                      ),
+                    
+                    // Read more button
+                    TextButton(
+                      onPressed: onReadMore,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFFd2982a),
+                      ),
+                      child: const Text('READ MORE'),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -159,52 +123,5 @@ class NewsCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  // Helper method to format the date
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      if (difference.inHours == 0) {
-        return '${difference.inMinutes} min ago';
-      }
-      return '${difference.inHours} hr ago';
-    } else if (difference.inDays <= 7) {
-      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
-    }
-
-    final month =
-        [
-          'Jan',
-          'Feb',
-          'Mar',
-          'Apr',
-          'May',
-          'Jun',
-          'Jul',
-          'Aug',
-          'Sep',
-          'Oct',
-          'Nov',
-          'Dec',
-        ][date.month - 1];
-
-    return '$month ${date.day}';
-  }
-
-  // Helper method to get a color for each source
-  Color _getSourceColor(String source) {
-    switch (source) {
-      case 'Local News':
-        return Colors.blue;
-      case 'NC Politics':
-        return Colors.red;
-      case 'Sports':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
   }
 }

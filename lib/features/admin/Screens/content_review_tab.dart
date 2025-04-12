@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart';
-import 'package:neusenews/features/admin/screens/article_preview_screen.dart';
-import 'package:neusenews/features/admin/screens/event_preview_screen.dart';
+import 'package:neusenews/features/admin/Screens/admin_review_screen.dart';
+import 'package:neusenews/features/admin/Screens/event_review_screen.dart';
 
 class ContentReviewTab extends StatefulWidget {
   const ContentReviewTab({super.key});
@@ -13,7 +12,7 @@ class ContentReviewTab extends StatefulWidget {
 }
 
 class _ContentReviewTabState extends State<ContentReviewTab>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = true;
 
@@ -90,164 +89,18 @@ class _ContentReviewTabState extends State<ContentReviewTab>
           controller: _tabController,
           labelColor: const Color(0xFFd2982a),
           unselectedLabelColor: Colors.grey,
-          tabs: const [Tab(text: 'Articles'), Tab(text: 'Events')],
+          tabs: const [
+            Tab(text: 'Sponsored Articles'),
+            Tab(text: 'Sponsored Events'),
+          ],
         ),
         Expanded(
           child: TabBarView(
             controller: _tabController,
-            children: [_buildArticlesTab(), _buildEventsTab()],
+            children: const [AdminReviewScreen(), EventReviewScreen()],
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildArticlesTab() {
-    return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('sponsored_articles')
-              .where('status', isEqualTo: 'pending_review')
-              .orderBy('submittedAt', descending: true)
-              .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: Color(0xFFd2982a)),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
-
-        final articles = snapshot.data?.docs ?? [];
-
-        if (articles.isEmpty) {
-          return const Center(child: Text('No articles pending review'));
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16.0),
-          itemCount: articles.length,
-          itemBuilder: (context, index) {
-            final article = articles[index].data() as Map<String, dynamic>;
-            final articleId = articles[index].id;
-
-            final submittedAt = article['submittedAt'] as Timestamp?;
-            final submittedDate =
-                submittedAt != null
-                    ? DateFormat.yMMMd().format(submittedAt.toDate())
-                    : 'Unknown date';
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12.0),
-              child: ListTile(
-                title: Text(
-                  article['title'] ?? 'Untitled Article',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  'Submitted: $submittedDate by ${article['authorName'] ?? 'Unknown'}',
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder:
-                          (context) => ArticlePreviewScreen(
-                            id: articleId,
-                            data: article,
-                          ),
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildEventsTab() {
-    return StreamBuilder<QuerySnapshot>(
-      stream:
-          FirebaseFirestore.instance
-              .collection('events')
-              .where('status', isEqualTo: 'pending_review')
-              .orderBy('submittedAt', descending: true)
-              .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(color: Color(0xFFd2982a)),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
-
-        final events = snapshot.data?.docs ?? [];
-
-        if (events.isEmpty) {
-          return const Center(child: Text('No events pending review'));
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(16.0),
-          itemCount: events.length,
-          itemBuilder: (context, index) {
-            final event = events[index].data() as Map<String, dynamic>;
-            final eventId = events[index].id;
-
-            final submittedAt = event['submittedAt'] as Timestamp?;
-            final submittedDate =
-                submittedAt != null
-                    ? DateFormat.yMMMd().format(submittedAt.toDate())
-                    : 'Unknown date';
-
-            final eventDate = event['eventDate'] as Timestamp?;
-            final formattedEventDate =
-                eventDate != null
-                    ? DateFormat.yMMMd().format(eventDate.toDate())
-                    : 'Unknown date';
-
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12.0),
-              child: ListTile(
-                title: Text(
-                  event['title'] ?? 'Untitled Event',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Event date: $formattedEventDate'),
-                    Text(
-                      'Submitted: $submittedDate by ${event['organizerName'] ?? 'Unknown'}',
-                    ),
-                  ],
-                ),
-                isThreeLine: true,
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder:
-                          (context) =>
-                              EventPreviewScreen(id: eventId, data: event),
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }

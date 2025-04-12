@@ -1,0 +1,63 @@
+// filepath: /Users/kristybock/news_app/lib/features/news/screens/sponsored_articles_screen.dart
+import 'package:flutter/material.dart';
+import 'package:neusenews/models/article.dart';
+import 'package:neusenews/services/news_service.dart';
+import 'package:neusenews/widgets/news_card.dart';
+
+class SponsoredArticlesScreen extends StatefulWidget {
+  const SponsoredArticlesScreen({super.key});
+
+  @override
+  State<SponsoredArticlesScreen> createState() => _SponsoredArticlesScreenState();
+}
+
+class _SponsoredArticlesScreenState extends State<SponsoredArticlesScreen> {
+  final NewsService _newsService = NewsService();
+  List<Article> _sponsoredArticles = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSponsoredArticles();
+  }
+
+  Future<void> _fetchSponsoredArticles() async {
+    try {
+      final articles = await _newsService.fetchSponsoredArticles();
+      setState(() {
+        _sponsoredArticles = articles;
+        _isLoading = false;
+      });
+    } catch (e) {
+      // Handle error
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Sponsored Articles'),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: _sponsoredArticles.length,
+              itemBuilder: (context, index) {
+                final article = _sponsoredArticles[index];
+                return NewsCard(
+                  article: article,
+                  onReadMore: () {
+                    // Navigate to article detail screen
+                    Navigator.pushNamed(context, '/articleDetail', arguments: article);
+                  },
+                );
+              },
+            ),
+    );
+  }
+}

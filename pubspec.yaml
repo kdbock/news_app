@@ -9,9 +9,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^3.13.0
-  firebase_auth: ^5.5.2
-  cloud_firestore: ^5.6.6
+  # Use consistent Firebase versions
+  firebase_core: ^2.1.1  # Last version supporting iOS 11.0
+  firebase_auth: ^4.1.1  # Compatible with firebase_core 2.1.1
+  # Adjust other Firebase packages accordingly
+  firebase_storage: ^11.2.2
+  cloud_firestore: ^4.8.0 
+  cloud_functions: ^4.3.2 # Correct package name
+  firebase_analytics: ^10.4.2
+  firebase_messaging: ^14.6.7  # Add this line
+  flutter_local_notifications: ^9.9.1  # Replace current flutter_local_notifications with this version
   provider: ^6.0.5
   google_sign_in: ^6.1.5           # Google Auth
   # sign_in_with_apple: ^4.3.0       # Temporarily comment this out
@@ -24,7 +31,6 @@ dependencies:
   cupertino_icons: ^1.0.8          # iOS-style icons
   share_plus: ^10.1.4  # Try a slightly older version if ^7.2.1 is causing issues
   webview_flutter: ^4.4.2          # Update to the latest version instead of 3.0.4
-  firebase_storage: ^12.4.4
   image_picker: ^1.0.4
   # file_picker: ^5.3.3
   path_provider: ^2.1.1
@@ -35,16 +41,28 @@ dependencies:
   # flutter_stripe: ^11.0.0         # Add these to your existing dependencies
   # flutter_credit_card: ^4.0.1
   # Add these dependencies
-  cloud_functions: ^5.3.4
   fl_chart: ^0.70.2 # Use the latest version
   transparent_image: ^2.0.1
   sign_in_with_apple: ^6.1.4
+  visibility_detector: ^0.4.0+2
+  connectivity_plus: ^5.0.1
+  geolocator: ^10.0.0
+  geocoding: ^2.1.1
+  get_it: ^7.6.0
+  firebase_crashlytics: ^3.0.0
+  shimmer: ^3.0.0
+  # Add new package for DNS resolution compatible with http ^1.2.0
+  # REMOVE THIS LINE:
+  # dns_handler: ^1.0.1  # Alternative DNS package
+ 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
   flutter_launcher_icons: ^0.14.3  # Add this line
+  mockito: ^5.4.0
+  build_runner: ^2.4.0
 
 flutter_launcher_icons:
   ios: true
@@ -56,6 +74,9 @@ flutter:
   assets:
     - assets/images/
     - assets/images/weather/
+    - assets/images/placeholders/ad_placeholder.png
+    - assets/images/placeholders/weather_sponsor.png
+    - assets/images/placeholders/news_sponsor.png
   # Add fonts here if needed
   # fonts:
   #   - family: CustomFont

@@ -38,7 +38,10 @@ class EventService {
 
       // Create base query
       Query query = _eventsCollection
-          .where('eventDate', isGreaterThanOrEqualTo: Timestamp.fromDate(today))
+          .where(
+            'eventDate',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()),
+          )
           .orderBy('eventDate');
 
       // If we're filtering for a specific month
@@ -167,5 +170,46 @@ class EventService {
   void clearCache() {
     _cachedEvents = [];
     _lastFetchTime = DateTime(2000);
+  }
+
+  /// Get sponsored events
+  Future<List<Event>> getSponsoredEvents({int limit = 10}) async {
+    try {
+      // Get current date at midnight
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+
+      // Query for sponsored events
+      final QuerySnapshot snapshot =
+          await _eventsCollection
+              .where('isSponsored', isEqualTo: true)
+              .where(
+                'eventDate',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(today),
+              )
+              .orderBy('eventDate')
+              .limit(limit)
+              .get();
+
+      debugPrint(
+        'Fetched ${snapshot.docs.length} sponsored events from Firestore',
+      );
+
+      // Process results
+      final List<Event> events = [];
+      for (final doc in snapshot.docs) {
+        try {
+          final event = Event.fromFirestore(doc);
+          events.add(event);
+        } catch (e) {
+          debugPrint('Error processing sponsored event ${doc.id}: $e');
+        }
+      }
+
+      return events;
+    } catch (e) {
+      debugPrint('Error loading sponsored events: $e');
+      return [];
+    }
   }
 }

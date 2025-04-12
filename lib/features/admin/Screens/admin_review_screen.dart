@@ -87,6 +87,24 @@ class _AdminReviewScreenState extends State<AdminReviewScreen> {
     }
   }
 
+  Future<void> _fetchPendingEvents() async {
+    try {
+      final snapshot =
+          await _firestore
+              .collection('events')
+              .where('status', isEqualTo: 'pending_review')
+              .orderBy('createdAt', descending: true)
+              .get();
+
+      debugPrint('Found ${snapshot.docs.length} pending events');
+
+      // Process events similar to how articles are processed
+      // You can add this to the UI in a separate tab or section
+    } catch (e) {
+      debugPrint('Error fetching pending events: $e');
+    }
+  }
+
   Future<void> _approveArticle(String id) async {
     try {
       setState(() => _isLoading = true);

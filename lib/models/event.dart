@@ -25,6 +25,9 @@ class Event {
     this.imageUrl,
   });
 
+  // Add getter for backwards compatibility
+  DateTime get date => eventDate;
+
   @override
   String toString() => title;
 

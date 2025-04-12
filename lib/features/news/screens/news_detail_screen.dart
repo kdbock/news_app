@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:neusenews/models/article.dart';
-import 'package:neusenews/models/ad.dart';
-import 'package:neusenews/widgets/in_feed_ad_banner.dart';
+import 'package:neusenews/features/advertising/models/ad_type.dart';
+import 'package:neusenews/features/advertising/widgets/in_feed_ad_banner.dart';
 import 'package:neusenews/widgets/app_drawer.dart';
 import 'package:neusenews/widgets/news_card.dart';
 import 'package:neusenews/services/news_service.dart';

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 // Remove the cloud_functions import for now
 // import 'package:cloud_functions/cloud_functions.dart';
 
@@ -211,7 +212,6 @@ class _SubmitSponsoredEventScreenState
   }
 
   Future<void> _submitEvent() async {
-    // Validate main form
     if (_formKey.currentState?.validate() != true) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill all required fields')),
@@ -237,11 +237,10 @@ class _SubmitSponsoredEventScreenState
       // Simulate payment processing with a delay
       await Future.delayed(const Duration(seconds: 2));
 
-      // Generate a mock payment ID
+      // Fix the truncated payment intent ID generation
       _paymentIntentId =
           'mock_payment_${DateTime.now().millisecondsSinceEpoch}';
 
-      // Now save the event
       setState(() {
         _isProcessingPayment = false;
         _isLoading = true;
@@ -253,26 +252,8 @@ class _SubmitSponsoredEventScreenState
       if (mounted) {
         setState(() => _isLoading = false);
 
-        showDialog(
-          context: context,
-          builder:
-              (context) => AlertDialog(
-                title: const Text('Event Submitted'),
-                content: const Text(
-                  'Your community event has been submitted and will be reviewed shortly. '
-                  'You will receive a confirmation email with details about your listing.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop(); // Go back to previous screen
-                    },
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
-        );
+        // Show confirmation dialog
+        await _showConfirmationDialog(eventId);
       }
     } catch (e) {
       if (mounted) {
@@ -289,6 +270,7 @@ class _SubmitSponsoredEventScreenState
     }
   }
 
+  // Complete the Firestore document creation with all required fields
   Future<String> _saveEventToFirestore() async {
     if (_startDate == null) throw Exception('Start date is required');
 
@@ -307,45 +289,140 @@ class _SubmitSponsoredEventScreenState
     try {
       String? imageUrl;
       if (_eventImages.isNotEmpty) {
-        // For now, just note that we have an image
-        // In a real app, upload to Firebase Storage here
-        imageUrl = 'placeholder_for_uploaded_image';
+        final File imageFile = File(_eventImages.first.path);
+
+        // Create a reference to Firebase Storage with a unique name
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('event_images')
+            .child(
+              '${DateTime.now().millisecondsSinceEpoch}_${_eventImages.first.name}',
+            );
+
+        // Upload the file
+        final uploadTask = storageRef.putFile(imageFile);
+
+        // Get the download URL after upload completes
+        final taskSnapshot = await uploadTask;
+        imageUrl = await taskSnapshot.ref.getDownloadURL();
+
+        debugPrint('Image uploaded to: $imageUrl');
       }
 
-      // Create the event document in Firestore
+      // Create the event document in Firestore with ALL required fields
       final docRef = await FirebaseFirestore.instance.collection('events').add({
         'title': _eventTitleController.text,
         'description': _descriptionController.text,
-        'location': '${_venueController.text}, ${_addressController.text}',
         'eventDate': Timestamp.fromDate(eventDateTime),
         'startTime': formattedStartTime,
         'endTime': formattedEndTime,
+        'location': _venueController.text,
+        'address': _addressController.text,
         'organizer': _organizationController.text,
         'contactName': _contactNameController.text,
+        'contactRole': _contactRoleController.text,
         'contactEmail': _emailController.text,
         'contactPhone': _phoneController.text,
         'eventType': _selectedEventType,
-        'isSponsored': true,
-        'submissionFee': _eventSubmissionPrice,
-        'paymentStatus': 'paid', // Mark as paid
-        'paymentId': _paymentIntentId,
-        'paymentDate': FieldValue.serverTimestamp(),
-        'ticketLink':
-            _ticketLinkController.text.isEmpty
-                ? null
-                : 'https://${_ticketLinkController.text}',
+        'ticketLink': _ticketLinkController.text,
         'hashtags': _hashtagsController.text,
         'ageRestrictions': _ageRestrictionsController.text,
         'rainDate': _rainDate != null ? Timestamp.fromDate(_rainDate!) : null,
+        'imageUrl': imageUrl,
+        'isSponsored': true,
+        'paymentIntentId': _paymentIntentId,
+        'status': 'pending_review',
         'createdAt': FieldValue.serverTimestamp(),
         'createdBy': FirebaseAuth.instance.currentUser?.uid,
-        'imageUrl': imageUrl,
+        'submissionFee': _eventSubmissionPrice,
       });
 
       return docRef.id;
     } catch (e) {
+      debugPrint('Error saving event to Firestore: $e');
       rethrow;
     }
+  }
+
+  // Ensure the confirmation dialog works properly
+  Future<void> _showConfirmationDialog(String eventId) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false, // User must tap button to close
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              const Icon(
+                Icons.check_circle,
+                color: Color(0xFFd2982a),
+                size: 28,
+              ),
+              const SizedBox(width: 10),
+              const Text('Submission Successful'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Your event has been submitted successfully and will be reviewed by our team.',
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Event ID: $eventId',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'You will receive a confirmation email at ${_emailController.text} with further details.',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                const Row(
+                  children: [
+                    Text(
+                      'Status: ',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Pending Admin Review',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pop(); // Return to previous screen
+              },
+              child: const Text('CLOSE'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFd2982a),
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close dialog
+                Navigator.of(context).pushReplacementNamed('/dashboard');
+              },
+              child: const Text('GO TO DASHBOARD'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   String? _validateCardNumber(String? value) {

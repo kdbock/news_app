@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:async';
 
 class SubmitNewsTipScreen extends StatefulWidget {
   const SubmitNewsTipScreen({super.key});
@@ -199,39 +203,92 @@ class _SubmitNewsTipScreenState extends State<SubmitNewsTipScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Here you would upload the images to your server/storage
-      // For now, we'll simulate the upload with a delay
+      // Create document data
+      final tipData = {
+        'headline': _headlineController.text,
+        'description': _descriptionController.text,
+        'category': _selectedCategory,
+        'location': _locationController.text,
+        'incidentDate':
+            _incidentDate != null ? Timestamp.fromDate(_incidentDate!) : null,
+        'incidentTime':
+            _incidentTime != null
+                ? '${_incidentTime!.hour}:${_incidentTime!.minute}'
+                : null,
+        'sources': _sourcesController.text,
+        'submittedAt': FieldValue.serverTimestamp(),
+        'status': 'pending_review',
+        'mediaUrls': <String>[],
+        'anonymous': _isAnonymous,
+      };
 
-      // Example of how to access the files
-      for (final XFile media in _mediaFiles) {
-        // Read file as bytes
-        final File file = File(media.path);
-        // final Uint8List bytes = await file.readAsBytes();
-
-        // Here you would upload the bytes to your server or cloud storage
-        // For now, just print the file name
-        debugPrint('Would upload: ${media.name} (${file.lengthSync()} bytes)');
+      // Add submitter info if not anonymous
+      if (!_isAnonymous) {
+        tipData['submitterName'] = _nameController.text;
+        tipData['submitterEmail'] = _emailController.text;
+        tipData['submitterPhone'] = _phoneController.text;
       }
 
-      await Future.delayed(const Duration(seconds: 2));
+      // Add user ID if logged in
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        tipData['submitterId'] = currentUser.uid;
+      }
+
+      // Create document in Firestore first to get document ID
+      final docRef = await FirebaseFirestore.instance
+          .collection('news_tips')
+          .add(tipData);
+
+      debugPrint('Created news tip with ID: ${docRef.id}');
+
+      // Upload media files if any
+      if (_mediaFiles.isNotEmpty) {
+        List<String> mediaUrls = [];
+
+        for (final XFile media in _mediaFiles) {
+          final File file = File(media.path);
+          final String fileName =
+              '${DateTime.now().millisecondsSinceEpoch}_${media.name}';
+
+          // Create storage reference
+          final storageRef = FirebaseStorage.instance
+              .ref()
+              .child('news_tips')
+              .child(docRef.id)
+              .child(fileName);
+
+          // Upload file
+          final uploadTask = await storageRef.putFile(file);
+
+          // Get download URL
+          final downloadUrl = await uploadTask.ref.getDownloadURL();
+          mediaUrls.add(downloadUrl);
+
+          debugPrint('Uploaded file to: $downloadUrl');
+        }
+
+        // Update document with media URLs
+        await docRef.update({'mediaUrls': mediaUrls});
+      }
 
       if (mounted) {
         setState(() => _isLoading = false);
 
-        showDialog(
+        // Show success dialog
+        await showDialog(
           context: context,
           builder:
               (context) => AlertDialog(
                 title: const Text('Thank You!'),
                 content: const Text(
-                  'Your news tip has been submitted and will be reviewed by our editorial team. '
-                  'We appreciate your contribution to local news.',
+                  'Your news tip has been submitted for review by our editorial team.',
                 ),
                 actions: [
                   TextButton(
                     onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop(); // Go back to previous screen
+                      Navigator.of(context).pop(); // Close dialog
+                      Navigator.of(context).pop(); // Return to previous screen
                     },
                     child: const Text('OK'),
                   ),
@@ -240,6 +297,7 @@ class _SubmitNewsTipScreenState extends State<SubmitNewsTipScreen> {
         );
       }
     } catch (e) {
+      debugPrint('Error submitting news tip: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(

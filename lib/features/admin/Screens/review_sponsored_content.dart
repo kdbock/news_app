@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import 'package:neusenews/features/admin/screens/article_preview_screen.dart';
-import 'package:neusenews/features/admin/screens/event_preview_screen.dart';
+import 'package:neusenews/features/admin/Screens/event_preview_screen.dart';
 
 class ReviewSponsoredContentScreen extends StatefulWidget {
   const ReviewSponsoredContentScreen({super.key});

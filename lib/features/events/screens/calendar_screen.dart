@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:neusenews/models/event.dart';
 import 'package:neusenews/services/event_service.dart';
 import 'package:neusenews/features/events/screens/submit_sponsored_event.dart';
+import 'package:neusenews/widgets/bottom_nav_bar.dart';
 
 class CalendarScreen extends StatefulWidget {
   final bool showAppBar;
@@ -501,48 +502,23 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 : null,
         drawer: null,
         body: calendarContent,
-        bottomNavigationBar: Container(
-          color: Colors.red.withOpacity(0.2), // Debug color
-          child: BottomNavigationBar(
-            currentIndex: 3, // Calendar tab is active
-            onTap: (index) {
-              print("Tapped bottom nav item: $index");
-              switch (index) {
-                case 0: // Home
-                  Navigator.pushReplacementNamed(context, '/home');
-                  break;
-                case 1: // News
-                  Navigator.pushReplacementNamed(context, '/news');
-                  break;
-                case 2: // Weather
-                  Navigator.pushReplacementNamed(context, '/weather');
-                  break;
-                case 3: // Calendar
-                  // Already on calendar page
-                  break;
-              }
-            },
-            items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.newspaper),
-                label: 'News',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.cloud),
-                label: 'Weather',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_month),
-                label: 'Calendar',
-              ),
-            ],
-            // Force show labels
-            showSelectedLabels: true,
-            showUnselectedLabels: true,
-            // Try fixed type
-            type: BottomNavigationBarType.fixed,
-          ),
+        bottomNavigationBar: AppBottomNavBar(
+          currentIndex: 3, // Calendar is selected
+          onTap: (index) {
+            switch (index) {
+              case 0: // Home
+                Navigator.pushReplacementNamed(context, '/dashboard');
+                break;
+              case 1: // News
+                Navigator.pushReplacementNamed(context, '/news');
+                break;
+              case 2: // Weather
+                Navigator.pushReplacementNamed(context, '/weather');
+                break;
+              case 3: // Calendar - already here
+                break;
+            }
+          },
         ),
       ),
     );

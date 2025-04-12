@@ -12,12 +12,13 @@ class Article {
   final List<String> categories;
   final bool isSponsored; // flag for sponsored content
   final String linkText; // custom text for CTA button
-  final String
-  source; // source name (e.g., company name for sponsored articles)
+  final String source; // source name (e.g., company name for sponsored articles)
+  final bool isRead; // track read status
+  final Map<String, double>? categoryScores;
+  final String? primaryCategory;
 
   // Add a getter for backward compatibility
-  String get link =>
-      url; // This ensures old code using article.link still works
+  String get link => url; // This ensures old code using article.link still works
 
   Article({
     this.id = '',
@@ -32,6 +33,9 @@ class Article {
     this.isSponsored = false,
     this.linkText = 'Read More',
     this.source = '',
+    this.isRead = false,
+    this.categoryScores,
+    this.primaryCategory,
   });
 
   // Helper method to parse RSS dates
@@ -45,12 +49,28 @@ class Article {
       return DateTime.parse(dateString);
     } catch (e) {
       try {
-        // Try RFC 822 format used by most RSS feeds
-        // Example: "Tue, 25 Mar 2025 16:16:17 +0000"
-        final dateFormat = DateFormat("EEE, dd MMM yyyy HH:mm:ss Z", "en_US");
-        return dateFormat.parse(dateString);
-      } catch (e) {
-        print('Failed to parse date: $dateString - $e');
+        // Try to parse RSS date format (RFC 822)
+        // Convert to a format that DateTime.parse can handle
+        final formats = [
+          'EEE, dd MMM yyyy HH:mm:ss Z', // Standard RSS
+          'dd MMM yyyy HH:mm:ss Z', // Some RSS feeds omit day name
+          'EEE, dd MMM yyyy HH:mm:ss', // Some RSS feeds omit timezone
+          'yyyy-MM-ddTHH:mm:ssZ', // ISO 8601
+          'yyyy-MM-dd HH:mm:ss', // Basic format
+        ];
+        
+        for (final format in formats) {
+          try {
+            return DateFormat(format).parse(dateString);
+          } catch (_) {
+            // Try next format
+          }
+        }
+        
+        // If all format parses fail, return current date
+        return DateTime.now();
+      } catch (_) {
+        // If all else fails, return current date
         return DateTime.now();
       }
     }
@@ -62,18 +82,27 @@ class Article {
     String imageUrl = 'assets/images/Default.jpeg';
 
     try {
-      // Check for image in the media content
-      if (item.media != null &&
-          item.media.contents != null &&
-          item.media.contents.isNotEmpty) {
-        imageUrl = item.media.contents.first.url ?? imageUrl;
+      // Try to get image from media:content
+      if (item.media?.contents != null && item.media!.contents.isNotEmpty) {
+        final mediaContent = item.media!.contents.first;
+        if (mediaContent.url != null && mediaContent.url.isNotEmpty) {
+          imageUrl = mediaContent.url;
+        }
       }
-      // Also check for image in enclosure (common in RSS)
+      // If no media:content, try enclosure
       else if (item.enclosure != null && item.enclosure.url != null) {
         imageUrl = item.enclosure.url;
       }
+      // If still no image, try to find an image in the description
+      else if (item.description != null) {
+        final imgRegExp = RegExp(r'<img[^>]+src="([^">]+)"');
+        final match = imgRegExp.firstMatch(item.description);
+        if (match != null && match.groupCount >= 1) {
+          imageUrl = match.group(1)!;
+        }
+      }
     } catch (e) {
-      print('Error extracting image: $e');
+      // If any error occurs while extracting the image, use the default
     }
 
     // Clean up description/excerpt by removing HTML tags
@@ -84,91 +113,167 @@ class Article {
     List<String> categories = [];
     try {
       if (item.categories != null) {
-        categories =
-            item.categories.map<String>((cat) {
-              // Handle different RSS feed formats for categories
-              if (cat.value != null) {
-                return cat.value.toString();
-              } else if (cat.domain != null) {
-                return cat.domain.toString();
-              } else if (cat is String) {
-                return cat;
-              }
-              return 'Uncategorized';
-            }).toList();
+        categories = item.categories.map<String>((cat) => cat.value).toList();
       }
     } catch (e) {
-      print('Error parsing categories: $e');
+      // If categories can't be parsed, leave as empty list
     }
 
     return Article(
-      title: item.title ?? 'No Title',
-      author: item.dc?.creator ?? 'Unknown',
+      id: item.guid ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      title: item.title ?? 'Untitled Article',
+      author: item.author ?? item.dc?.creator ?? 'Staff Reporter',
       publishDate: _parseRssDate(item.pubDate),
-      excerpt: excerpt,
-      content: excerpt, // For RSS items, content is the same as excerpt
       imageUrl: imageUrl,
       url: item.link ?? '',
+      excerpt: excerpt,
       categories: categories,
-      isSponsored: false, // RSS feeds are not sponsored content
-      source: item.source?.title ?? 'News Feed',
+      isSponsored: categories.any((cat) => cat.toLowerCase().contains('sponsor')),
+      source: _determineSource(item),
     );
+  }
+  
+  // Helper to determine source from feed item
+  static String _determineSource(dynamic item) {
+    try {
+      if (item.dc?.creator != null) return item.dc!.creator;
+      if (item.author != null) return item.author;
+      
+      // Check if it's from specific feeds we know
+      final link = item.link ?? '';
+      if (link.contains('neusenewssports.com')) return 'Sports';
+      if (link.contains('ncpoliticalnews.com')) return 'NC Politics';
+      
+      return 'Neuse News';
+    } catch (_) {
+      return 'Neuse News';
+    }
   }
 
   // Factory constructor for Firestore sponsored articles
   factory Article.fromFirestore(String documentId, Map<String, dynamic> data) {
     return Article(
       id: documentId,
-      title: data['title'] ?? 'No Title',
-      author: data['authorName'] ?? 'Sponsored',
+      title: data['title'] ?? 'Untitled Article',
+      author: data['authorName'] ?? 'Sponsor',
       publishDate: data['publishedAt']?.toDate() ?? DateTime.now(),
       imageUrl: data['headerImageUrl'] ?? 'assets/images/Default.jpeg',
-      content: data['content'] ?? '',
-      excerpt:
-          data['content'] != null && data['content'].length > 150
-              ? '${data['content'].substring(0, 150)}...'
-              : data['content'] ?? '',
       url: data['ctaLink'] ?? '',
-      linkText: data['ctaText'] ?? 'Learn More',
+      content: data['content'] ?? '',
+      excerpt: data['excerpt'] ?? '',
       isSponsored: true,
+      linkText: data['ctaText'] ?? 'Learn More',
       source: data['companyName'] ?? 'Sponsored Content',
-      categories: data['category'] != null ? [data['category']] : ['Sponsored'],
+    );
+  }
+  
+  // JSON serialization for caching
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'title': title,
+      'author': author,
+      'publishDate': publishDate.toIso8601String(),
+      'imageUrl': imageUrl,
+      'url': url,
+      'content': content,
+      'excerpt': excerpt,
+      'categories': categories,
+      'isSponsored': isSponsored,
+      'linkText': linkText,
+      'source': source,
+      'isRead': isRead,
+      'categoryScores': categoryScores,
+      'primaryCategory': primaryCategory,
+    };
+  }
+  
+  // JSON deserialization for caching
+  factory Article.fromJson(Map<String, dynamic> json) {
+    List<String> categoryList = [];
+    if (json['categories'] != null) {
+      categoryList = List<String>.from(json['categories']);
+    }
+    
+    Map<String, double>? scores;
+    if (json['categoryScores'] != null) {
+      scores = Map<String, double>.from(json['categoryScores']);
+    }
+    
+    return Article(
+      id: json['id'] ?? '',
+      title: json['title'] ?? 'Untitled Article',
+      author: json['author'] ?? 'Unknown Author',
+      publishDate: DateTime.parse(json['publishDate']),
+      imageUrl: json['imageUrl'] ?? 'assets/images/Default.jpeg',
+      url: json['url'] ?? '',
+      content: json['content'] ?? '',
+      excerpt: json['excerpt'] ?? '',
+      categories: categoryList,
+      isSponsored: json['isSponsored'] ?? false,
+      linkText: json['linkText'] ?? 'Read More',
+      source: json['source'] ?? 'Neuse News',
+      isRead: json['isRead'] ?? false,
+      categoryScores: scores,
+      primaryCategory: json['primaryCategory'],
     );
   }
 
   // Returns the excerpt as properly formatted paragraphs
   String get formattedContent {
     if (content.isNotEmpty) {
-      // For sponsored articles with full content
       return _formatText(content);
     } else if (excerpt.isNotEmpty) {
-      // For RSS articles with only excerpt
       return _formatText(excerpt);
     }
     return '';
+  }
+  
+  // Create a copy of the article with modified properties
+  Article copyWith({
+    String? id,
+    String? title,
+    String? author,
+    DateTime? publishDate,
+    String? imageUrl,
+    String? url,
+    String? content,
+    String? excerpt,
+    List<String>? categories,
+    bool? isSponsored,
+    String? linkText,
+    String? source,
+    bool? isRead,
+  }) {
+    return Article(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      author: author ?? this.author,
+      publishDate: publishDate ?? this.publishDate,
+      imageUrl: imageUrl ?? this.imageUrl,
+      url: url ?? this.url,
+      content: content ?? this.content,
+      excerpt: excerpt ?? this.excerpt,
+      categories: categories ?? this.categories,
+      isSponsored: isSponsored ?? this.isSponsored,
+      linkText: linkText ?? this.linkText,
+      source: source ?? this.source,
+      isRead: isRead ?? this.isRead,
+    );
   }
 
   // Helper method to format text
   String _formatText(String text) {
     // Clean up common RSS/HTML issues
-    String cleanedText =
-        text
-            // Replace HTML line breaks with actual line breaks
-            .replaceAll(RegExp(r'<br\s*\/?>'), '\n')
-            // Replace multiple consecutive line breaks with double line breaks
-            .replaceAll(RegExp(r'\n{3,}'), '\n\n')
-            // Replace HTML entities
-            .replaceAll('&nbsp;', ' ')
-            .replaceAll('&amp;', '&')
-            .replaceAll('&quot;', '"')
-            .replaceAll('&apos;', "'")
-            .replaceAll('&lt;', '<')
-            .replaceAll('&gt;', '>')
-            // Remove any remaining HTML tags
-            .replaceAll(RegExp(r'<[^>]*>'), '')
-            // Trim extra spaces
-            .replaceAll(RegExp(r'\s{2,}'), ' ')
-            .trim();
+    String cleanedText = text
+        .replaceAll(RegExp(r'<[^>]*>'), '') // Remove HTML tags
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&quot;', '"')
+        .replaceAll('&apos;', "'")
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('\r', ''); // Clean up newlines
 
     // Split into paragraphs and clean up each paragraph
     List<String> paragraphs = cleanedText.split('\n\n');
