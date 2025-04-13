@@ -6,7 +6,7 @@ import 'firebase_options.dart';
 import 'package:neusenews/di/service_locator.dart';
 import 'package:neusenews/theme/app_theme.dart';
 import 'package:neusenews/di/app_services.dart';
-import 'package:neusenews/widgets/bottom_nav_bar.dart'; // Add this import
+import 'package:neusenews/widgets/bottom_nav_bar.dart';
 
 // Import services and providers
 import 'package:neusenews/services/connectivity_service.dart';
@@ -35,6 +35,9 @@ import 'package:neusenews/features/users/screens/investor_dashboard_screen.dart'
 import 'package:neusenews/screens/settings_screen.dart';
 import 'package:neusenews/features/users/screens/login_screen.dart';
 import 'package:neusenews/features/events/screens/event_detail_screen.dart';
+// Add imports for new authentication screens
+import 'package:neusenews/features/users/screens/register_screen.dart';
+import 'package:neusenews/features/users/screens/password_reset_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -127,7 +130,10 @@ class _MyAppState extends State<MyApp> {
           '/my-contributions': (context) => const MyContributionsScreen(),
           '/investor-dashboard': (context) => const InvestorDashboardScreen(),
           '/settings': (context) => const SettingsScreen(),
+          // Authentication routes
           '/login': (context) => const LoginScreen(),
+          '/register': (context) => const RegisterScreen(),
+          '/password-reset': (context) => const PasswordResetScreen(),
           '/base-category':
               (context) => const BaseCategoryScreen(
                 category: 'defaultCategory',
