@@ -6,6 +6,7 @@ import 'firebase_options.dart';
 import 'package:neusenews/di/service_locator.dart';
 import 'package:neusenews/theme/app_theme.dart';
 import 'package:neusenews/di/app_services.dart';
+import 'package:neusenews/widgets/bottom_nav_bar.dart'; // Add this import
 
 // Import services and providers
 import 'package:neusenews/services/connectivity_service.dart';
@@ -70,26 +71,31 @@ void main() async {
   runApp(MyApp(services: services));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final AppServices services;
 
   const MyApp({super.key, required this.services});
 
   @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<ConnectivityService>.value(
-          value: services.connectivityService,
+          value: widget.services.connectivityService,
         ),
         ChangeNotifierProvider<NewsProvider>.value(
-          value: services.newsProvider,
+          value: widget.services.newsProvider,
         ),
         ChangeNotifierProvider<WeatherProvider>.value(
-          value: services.weatherProvider,
+          value: widget.services.weatherProvider,
         ),
         ChangeNotifierProvider<EventsProvider>.value(
-          value: services.eventsProvider,
+          value: widget.services.eventsProvider,
         ),
         ChangeNotifierProvider<app_auth.AuthProvider>(
           create: (_) => app_auth.AuthProvider(),
@@ -102,8 +108,8 @@ class MyApp extends StatelessWidget {
         themeMode: ThemeMode.system,
         home: const SplashScreen(),
         routes: {
-          '/dashboard': (context) => const DashboardScreen(),
-          '/home': (context) => const DashboardScreen(),
+          '/dashboard': (context) => const HomeNavigator(),
+          '/home': (context) => const HomeNavigator(),
           '/news': (context) => const NewsScreen(),
           '/weather': (context) => const WeatherScreen(),
           '/calendar': (context) => const CalendarScreen(),
@@ -142,5 +148,54 @@ class MyApp extends StatelessWidget {
         },
       ),
     );
+  }
+}
+
+// New persistent navigation class
+class HomeNavigator extends StatefulWidget {
+  const HomeNavigator({super.key});
+
+  @override
+  State<HomeNavigator> createState() => _HomeNavigatorState();
+}
+
+class _HomeNavigatorState extends State<HomeNavigator> {
+  final PageController _pageController = PageController();
+  int _currentIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(), // Disable swiping
+        children: const [
+          DashboardScreen(showBottomNav: false),
+          NewsScreen(showBottomNav: false),
+          WeatherScreen(showBottomNav: false),
+          CalendarScreen(showBottomNav: false),
+        ],
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+      ),
+      bottomNavigationBar: AppBottomNavBar(
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+            _pageController.jumpToPage(index);
+          });
+        },
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 }

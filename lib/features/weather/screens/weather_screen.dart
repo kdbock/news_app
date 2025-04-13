@@ -136,31 +136,50 @@ class _WeatherScreenState extends State<WeatherScreen>
       builder: (context, weatherProvider, _) {
         // Build UI based on weatherProvider state
         return Scaffold(
-          appBar:
-              widget.showAppBar ? AppBar(title: const Text('Weather')) : null,
-          drawer: widget.showAppBar ? const AppDrawer() : null,
+          appBar: widget.showAppBar 
+              ? AppBar(
+                  title: const Text('Weather'),
+                  leading: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () {
+                      // Check if we're at the root navigator (part of PageView)
+                      if (Navigator.of(context).canPop()) {
+                        // If we can pop, we're not at the root - safe to pop
+                        Navigator.of(context).pop();
+                      } else {
+                        // We're likely in the PageView - navigate to dashboard
+                        Navigator.of(context).pushReplacementNamed('/dashboard');
+                      }
+                    },
+                  ),
+                ) 
+              : null,
+          drawer: null, // Remove the drawer completely
           body: RefreshIndicator(
             onRefresh: _refreshWeatherData,
             child: _buildWeatherContent(weatherProvider),
           ),
-          bottomNavigationBar: AppBottomNavBar(
-            currentIndex: 2, // Weather is selected
-            onTap: (index) {
-              switch (index) {
-                case 0: // Home
-                  Navigator.pushReplacementNamed(context, '/dashboard');
-                  break;
-                case 1: // News
-                  Navigator.pushReplacementNamed(context, '/news');
-                  break;
-                case 2: // Weather - already here
-                  break;
-                case 3: // Calendar
-                  Navigator.pushReplacementNamed(context, '/calendar');
-                  break;
-              }
-            },
-          ),
+          bottomNavigationBar:
+              widget.showBottomNav
+                  ? AppBottomNavBar(
+                    currentIndex: 2, // Weather is selected
+                    onTap: (index) {
+                      switch (index) {
+                        case 0: // Home
+                          Navigator.pushReplacementNamed(context, '/dashboard');
+                          break;
+                        case 1: // News
+                          Navigator.pushReplacementNamed(context, '/news');
+                          break;
+                        case 2: // Weather - already here
+                          break;
+                        case 3: // Calendar
+                          Navigator.pushReplacementNamed(context, '/calendar');
+                          break;
+                      }
+                    },
+                  )
+                  : null,
         );
       },
     );

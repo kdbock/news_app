@@ -23,7 +23,10 @@ import 'package:neusenews/features/advertising/widgets/in_feed_ad_banner.dart';
 import 'package:neusenews/features/advertising/models/ad_type.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final bool showBottomNav;
+
+  // Add this parameter to the constructor
+  const DashboardScreen({super.key, this.showBottomNav = true});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -119,25 +122,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         },
       ),
-      bottomNavigationBar: AppBottomNavBar(
-        currentIndex: _selectedIndex,
-        onTap: (index) {
-          setState(() => _selectedIndex = index);
-          switch (index) {
-            case 0:
-              break;
-            case 1:
-              Navigator.pushReplacementNamed(context, '/news');
-              break;
-            case 2:
-              Navigator.pushReplacementNamed(context, '/weather');
-              break;
-            case 3:
-              Navigator.pushReplacementNamed(context, '/calendar');
-              break;
-          }
-        },
-      ),
+      bottomNavigationBar:
+          widget.showBottomNav
+              ? AppBottomNavBar(
+                currentIndex: _selectedIndex,
+                onTap: (index) {
+                  setState(() => _selectedIndex = index);
+                  switch (index) {
+                    case 0:
+                      break;
+                    case 1:
+                      Navigator.pushReplacementNamed(context, '/news');
+                      break;
+                    case 2:
+                      Navigator.pushReplacementNamed(context, '/weather');
+                      break;
+                    case 3:
+                      Navigator.pushReplacementNamed(context, '/calendar');
+                      break;
+                  }
+                },
+              )
+              : null,
     );
   }
 

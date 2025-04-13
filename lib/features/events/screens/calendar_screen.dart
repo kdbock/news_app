@@ -11,8 +11,14 @@ import 'package:neusenews/widgets/bottom_nav_bar.dart';
 class CalendarScreen extends StatefulWidget {
   final bool showAppBar;
   final DateTime? selectedDate;
+  final bool showBottomNav;
 
-  const CalendarScreen({super.key, this.showAppBar = true, this.selectedDate});
+  const CalendarScreen({
+    super.key,
+    this.showAppBar = true,
+    this.selectedDate,
+    this.showBottomNav = true,
+  });
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();
@@ -472,7 +478,16 @@ class _CalendarScreenState extends State<CalendarScreen> {
                   leading: IconButton(
                     icon: const Icon(Icons.arrow_back),
                     onPressed: () {
-                      Navigator.of(context).pop();
+                      // Check if we're at the root navigator (part of PageView)
+                      if (Navigator.of(context).canPop()) {
+                        // If we can pop, we're not at the root - safe to pop
+                        Navigator.of(context).pop();
+                      } else {
+                        // We're likely in the PageView - navigate to dashboard
+                        Navigator.of(
+                          context,
+                        ).pushReplacementNamed('/dashboard');
+                      }
                     },
                   ),
                   title: const Text('Events Calendar'),
@@ -502,24 +517,27 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 : null,
         drawer: null,
         body: calendarContent,
-        bottomNavigationBar: AppBottomNavBar(
-          currentIndex: 3, // Calendar is selected
-          onTap: (index) {
-            switch (index) {
-              case 0: // Home
-                Navigator.pushReplacementNamed(context, '/dashboard');
-                break;
-              case 1: // News
-                Navigator.pushReplacementNamed(context, '/news');
-                break;
-              case 2: // Weather
-                Navigator.pushReplacementNamed(context, '/weather');
-                break;
-              case 3: // Calendar - already here
-                break;
-            }
-          },
-        ),
+        bottomNavigationBar:
+            widget.showBottomNav
+                ? AppBottomNavBar(
+                  currentIndex: 3, // Calendar is selected
+                  onTap: (index) {
+                    switch (index) {
+                      case 0: // Home
+                        Navigator.pushReplacementNamed(context, '/dashboard');
+                        break;
+                      case 1: // News
+                        Navigator.pushReplacementNamed(context, '/news');
+                        break;
+                      case 2: // Weather
+                        Navigator.pushReplacementNamed(context, '/weather');
+                        break;
+                      case 3: // Calendar - already here
+                        break;
+                    }
+                  },
+                )
+                : null,
       ),
     );
   }

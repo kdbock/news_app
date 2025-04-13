@@ -75,7 +75,7 @@ class _AuthScreenState extends State<LoginScreen>
     _errorMessage = ''; // Clear previous errors
 
     try {
-      // First check network connectivity
+      // Check network connectivity first
       var connectivityResult = await Connectivity().checkConnectivity();
       if (connectivityResult == ConnectivityResult.none) {
         setState(() {
@@ -86,7 +86,6 @@ class _AuthScreenState extends State<LoginScreen>
         return;
       }
 
-      // Continue with login as before
       print("Attempting login with: ${_emailController.text.trim()}");
 
       final user = await _authService.login(
@@ -98,6 +97,10 @@ class _AuthScreenState extends State<LoginScreen>
 
       if (user != null && mounted) {
         Navigator.pushReplacementNamed(context, '/dashboard');
+      } else {
+        setState(
+          () => _errorMessage = 'Login failed. Please check your credentials.',
+        );
       }
     } on FirebaseAuthException catch (e) {
       print("Firebase Auth Exception: ${e.code} - ${e.message}");
@@ -128,37 +131,39 @@ class _AuthScreenState extends State<LoginScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Network Error'),
-        content: const Text(
-            'Unable to connect to the server. Please check your internet connection and try again.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('CANCEL'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _login(); // Retry login
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFd2982a),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Network Error'),
+            content: const Text(
+              'Unable to connect to the server. Please check your internet connection and try again.',
             ),
-            child: const Text('RETRY'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('CANCEL'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _login(); // Retry login
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFd2982a),
+                ),
+                child: const Text('RETRY'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // Skip authentication and go to dashboard in offline mode
+                  Navigator.pushReplacementNamed(context, '/dashboard');
+                },
+                child: const Text('CONTINUE OFFLINE'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              // Skip authentication and go to dashboard in offline mode
-              Navigator.pushReplacementNamed(context, '/dashboard');
-            },
-            child: const Text('CONTINUE OFFLINE'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -471,23 +476,25 @@ class _AuthScreenState extends State<LoginScreen>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isLoading
-                      ? null
-                      : () {
-                          if (_loginFormKey.currentState!.validate()) {
-                            _login(); // Use your existing _login method instead of mixing approaches
-                          }
-                        },
+                  onPressed:
+                      _isLoading
+                          ? null
+                          : () {
+                            if (_loginFormKey.currentState!.validate()) {
+                              _login(); // Use your existing _login method instead of mixing approaches
+                            }
+                          },
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     backgroundColor: const Color(0xFFd2982a),
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'LOGIN',
-                          style: TextStyle(color: Colors.white),
-                        ),
+                  child:
+                      _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                            'LOGIN',
+                            style: TextStyle(color: Colors.white),
+                          ),
                 ),
               ),
               _buildSocialButtons(),
@@ -601,14 +608,15 @@ class _AuthScreenState extends State<LoginScreen>
               CheckboxListTile(
                 title: const Text('Neuse News Sports Newsletter'),
                 value: _sportsNewsletter,
-                onChanged: (value) => setState(() => _sportsNewsletter = value!),
+                onChanged:
+                    (value) => setState(() => _sportsNewsletter = value!),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
               CheckboxListTile(
                 title: const Text('NC Political News Newsletter'),
                 value: _politicalNewsletter,
-                onChanged: (value) =>
-                    setState(() => _politicalNewsletter = value!),
+                onChanged:
+                    (value) => setState(() => _politicalNewsletter = value!),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
               const SizedBox(height: 15),
@@ -616,157 +624,161 @@ class _AuthScreenState extends State<LoginScreen>
                 children: [
                   Checkbox(
                     value: _privacyPolicyAccepted,
-                    onChanged: (value) =>
-                        setState(() => _privacyPolicyAccepted = value!),
+                    onChanged:
+                        (value) =>
+                            setState(() => _privacyPolicyAccepted = value!),
                   ),
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Privacy Policy'),
-                          content: SingleChildScrollView(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: const [
-                                Text(
-                                  'PRIVACY POLICY',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
+                      onTap:
+                          () => showDialog(
+                            context: context,
+                            builder:
+                                (context) => AlertDialog(
+                                  title: const Text('Privacy Policy'),
+                                  content: SingleChildScrollView(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Text(
+                                          'PRIVACY POLICY',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        SizedBox(height: 10),
+                                        Text('Last Updated: March 25, 2025'),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'Magic Mile Media, LLC ("we," "our," or "us") operates the Neuse News, NC Political News, and Neuse News Sports mobile application (the "Service"). This Privacy Policy informs you of our policies regarding the collection, use, and disclosure of personal data when you use our Service.',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'INFORMATION WE COLLECT',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          '• Personal Information: Name, email address, phone number, ZIP code, and date of birth provided during registration.\n'
+                                          '• Usage Data: Information on how you access and use the Service.\n'
+                                          '• Device Information: Device type, operating system, and browser information.\n'
+                                          '• Location Data: General location based on IP address or ZIP code.',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'HOW WE USE YOUR INFORMATION',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          '• To provide and maintain our Service\n'
+                                          '• To notify you about changes to our Service\n'
+                                          '• To allow you to participate in interactive features\n'
+                                          '• To provide customer support\n'
+                                          '• To gather analysis to improve our Service\n'
+                                          '• To send newsletters and marketing communications you have opted into\n'
+                                          '• To monitor the usage of our Service\n'
+                                          '• To detect, prevent and address technical issues',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'DISCLOSURE OF DATA',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          'We may disclose your Personal Data in the following situations:\n'
+                                          '• To affiliates: Including Neuse News, NC Political News, and Neuse News Sports\n'
+                                          '• To service providers: To perform service-related services or assist in analyzing how our Service is used\n'
+                                          '• For business transfers: In connection with any merger, acquisition, or sale of assets\n'
+                                          '• With your consent: With your explicit permission\n'
+                                          '• For legal requirements: To comply with legal obligations',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'SECURITY',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          'The security of your data is important to us, but remember that no method of transmission over the Internet or method of electronic storage is 100% secure.',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'YOUR RIGHTS',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          'You have the right to:\n'
+                                          '• Access, update, or delete your personal information\n'
+                                          '• Object to or restrict the processing of your personal data\n'
+                                          '• Request a portable copy of your personal data\n'
+                                          '• Opt out of marketing communications',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'CHANGES TO THIS PRIVACY POLICY',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          'We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last Updated" date.',
+                                        ),
+                                        SizedBox(height: 15),
+                                        Text(
+                                          'CONTACT US',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        SizedBox(height: 5),
+                                        Text(
+                                          'If you have any questions about this Privacy Policy, please contact us at:\n'
+                                          'Magic Mile Media, LLC\n'
+                                          'Email: privacy@magicmilemedia.com\n'
+                                          'Phone: (252) 555-1212',
+                                        ),
+                                      ],
+                                    ),
                                   ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(context),
+                                      child: const Text('Close'),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        Navigator.pop(context);
+                                        setState(
+                                          () => _privacyPolicyAccepted = true,
+                                        );
+                                      },
+                                      child: const Text(
+                                        'Accept',
+                                        style: TextStyle(
+                                          color: Color(0xFFd2982a),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                SizedBox(height: 10),
-                                Text('Last Updated: March 25, 2025'),
-                                SizedBox(height: 15),
-                                Text(
-                                  'Magic Mile Media, LLC ("we," "our," or "us") operates the Neuse News, NC Political News, and Neuse News Sports mobile application (the "Service"). This Privacy Policy informs you of our policies regarding the collection, use, and disclosure of personal data when you use our Service.',
-                                ),
-                                SizedBox(height: 15),
-                                Text(
-                                  'INFORMATION WE COLLECT',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 5),
-                                Text(
-                                  '• Personal Information: Name, email address, phone number, ZIP code, and date of birth provided during registration.\n'
-                                  '• Usage Data: Information on how you access and use the Service.\n'
-                                  '• Device Information: Device type, operating system, and browser information.\n'
-                                  '• Location Data: General location based on IP address or ZIP code.',
-                                ),
-                                SizedBox(height: 15),
-                                Text(
-                                  'HOW WE USE YOUR INFORMATION',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 5),
-                                Text(
-                                  '• To provide and maintain our Service\n'
-                                  '• To notify you about changes to our Service\n'
-                                  '• To allow you to participate in interactive features\n'
-                                  '• To provide customer support\n'
-                                  '• To gather analysis to improve our Service\n'
-                                  '• To send newsletters and marketing communications you have opted into\n'
-                                  '• To monitor the usage of our Service\n'
-                                  '• To detect, prevent and address technical issues',
-                                ),
-                                SizedBox(height: 15),
-                                Text(
-                                  'DISCLOSURE OF DATA',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 5),
-                                Text(
-                                  'We may disclose your Personal Data in the following situations:\n'
-                                  '• To affiliates: Including Neuse News, NC Political News, and Neuse News Sports\n'
-                                  '• To service providers: To perform service-related services or assist in analyzing how our Service is used\n'
-                                  '• For business transfers: In connection with any merger, acquisition, or sale of assets\n'
-                                  '• With your consent: With your explicit permission\n'
-                                  '• For legal requirements: To comply with legal obligations',
-                                ),
-                                SizedBox(height: 15),
-                                Text(
-                                  'SECURITY',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 5),
-                                Text(
-                                  'The security of your data is important to us, but remember that no method of transmission over the Internet or method of electronic storage is 100% secure.',
-                                ),
-                                SizedBox(height: 15),
-                                Text(
-                                  'YOUR RIGHTS',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 5),
-                                Text(
-                                  'You have the right to:\n'
-                                  '• Access, update, or delete your personal information\n'
-                                  '• Object to or restrict the processing of your personal data\n'
-                                  '• Request a portable copy of your personal data\n'
-                                  '• Opt out of marketing communications',
-                                ),
-                                SizedBox(height: 15),
-                                Text(
-                                  'CHANGES TO THIS PRIVACY POLICY',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 5),
-                                Text(
-                                  'We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last Updated" date.',
-                                ),
-                                SizedBox(height: 15),
-                                Text(
-                                  'CONTACT US',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(height: 5),
-                                Text(
-                                  'If you have any questions about this Privacy Policy, please contact us at:\n'
-                                  'Magic Mile Media, LLC\n'
-                                  'Email: privacy@magicmilemedia.com\n'
-                                  'Phone: (252) 555-1212',
-                                ),
-                              ],
-                            ),
                           ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Close'),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                setState(
-                                  () => _privacyPolicyAccepted = true,
-                                );
-                              },
-                              child: const Text(
-                                'Accept',
-                                style: TextStyle(
-                                  color: Color(0xFFd2982a),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                       child: const Text(
                         'I have read and accept the Privacy Policy*',
                         style: TextStyle(decoration: TextDecoration.underline),
@@ -792,12 +804,13 @@ class _AuthScreenState extends State<LoginScreen>
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     backgroundColor: const Color(0xFFd2982a),
                   ),
-                  child: _isLoading
-                      ? const CircularProgressIndicator(color: Colors.white)
-                      : const Text(
-                          'REGISTER',
-                          style: TextStyle(color: Colors.white),
-                        ),
+                  child:
+                      _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                            'REGISTER',
+                            style: TextStyle(color: Colors.white),
+                          ),
                 ),
               ),
               _buildSocialButtons(),

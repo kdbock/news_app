@@ -370,21 +370,30 @@ class _NewsScreenState extends State<NewsScreen>
       appBar:
           widget.showAppBar
               ? AppBar(
-                // Replace hamburger menu with back button
-                leading: IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.of(context).maybePop(),
+                backgroundColor:
+                    Colors.white, // Change from previous color to white
+                elevation: 0, // Remove shadow
+                title: Text(
+                  'News',
+                  style: TextStyle(
+                    color: Colors.black,
+                  ), // Change text color to match white background
                 ),
-                title: const Text('News'),
-                backgroundColor: const Color(0xFFd2982a),
-                foregroundColor: Colors.white,
-                elevation: 0,
+                iconTheme: IconThemeData(
+                  color: Colors.black,
+                ), // Change icon colors to match white background
                 bottom: TabBar(
                   controller: _tabController,
-                  labelColor: Colors.white,
-                  unselectedLabelColor: Colors.white.withOpacity(0.7),
-                  indicatorColor: Colors.white,
-                  indicatorWeight: 3.0,
+                  labelColor: const Color(
+                    0xFFd2982a,
+                  ), // Gold color for active category
+                  unselectedLabelColor: const Color(
+                    0xFF2d2c31,
+                  ), // Dark gray for inactive categories
+                  indicatorColor: const Color(
+                    0xFFd2982a,
+                  ), // Gold color for the indicator line
+                  indicatorWeight: 3.0, // Make indicator slightly thicker
                   labelStyle: const TextStyle(fontWeight: FontWeight.bold),
                   tabs: _tabs.map((tab) => Tab(text: tab)).toList(),
                   isScrollable: true,
@@ -411,7 +420,10 @@ class _NewsScreenState extends State<NewsScreen>
                 onTap: (index) {
                   switch (index) {
                     case 0: // Home
-                      Navigator.pushReplacementNamed(context, '/');
+                      Navigator.pushReplacementNamed(
+                        context,
+                        '/dashboard',
+                      ); // Using dashboard route
                       break;
                     case 1: // News - already here
                       break;
