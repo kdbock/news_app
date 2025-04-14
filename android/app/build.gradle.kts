@@ -49,8 +49,14 @@ android {
         applicationId = "com.wordnerd.neusenews"
         minSdkVersion(23)
         targetSdkVersion(34)
-        versionCode = 3 // Increment this for every new release
-        versionName = "1.1.0" // Update this to the new version name
+        versionCode = 5 // Increment from your current 3
+        versionName = "1.1.6" // Increment from your current 1.1.5
+        
+        // Add this to ensure proper device compatibility
+        ndk {
+            // Include all common architectures for maximum compatibility
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+        }
     }
 
     buildTypes {
@@ -61,11 +67,31 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             
             // Enable debug symbols
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = true  // Enable for smaller app size
+            isShrinkResources = true  // Enable for smaller app size
             ndk {
-                debugSymbolLevel = "FULL"
+                debugSymbolLevel = "SYMBOL_TABLE"
             }
+        }
+    }
+
+    // Add this for better screen compatibility
+    bundle {
+        language {
+            enableSplit = false
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
+        }
+    }
+
+    // Enable native debug symbols extraction
+    packagingOptions {
+        jniLibs {
+            keepDebugSymbols.addAll(listOf("**/*.so"))
         }
     }
 }
@@ -80,6 +106,9 @@ dependencies {
     
     // Add Stripe dependencies explicitly
     implementation("com.stripe:stripe-android:20.29.1") 
+    
+    // Add the dependency for the Play Integrity API
+    implementation("com.google.android.play:integrity:1.3.0")
 }
 
 flutter {

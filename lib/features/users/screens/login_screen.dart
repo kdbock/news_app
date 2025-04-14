@@ -10,9 +10,9 @@ class LoginScreen extends StatefulWidget {
   final int initialTab;
 
   const LoginScreen({
-    Key? key,
+    super.key,
     this.initialTab = 0, // Default to login tab (0)
-  }) : super(key: key);
+  });
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();

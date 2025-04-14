@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Make sure you have proper screen support -->
+    <supports-screens
+        android:smallScreens="true"
+        android:normalScreens="true"
+        android:largeScreens="true"
+        android:xlargeScreens="true" />
+        
     <!-- Add these permission lines -->
     <uses-permission android:name="android.permission.INTERNET"/>
     

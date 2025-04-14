@@ -112,9 +112,9 @@ class _MyContributionsScreenState extends State<MyContributionsScreen>
         String typeToShow = _tabs[tabIndex].toLowerCase();
 
         // Convert plural tab names to singular as stored in the data
-        if (typeToShow == 'articles')
+        if (typeToShow == 'articles') {
           typeToShow = 'article';
-        else if (typeToShow == 'events')
+        } else if (typeToShow == 'events')
           typeToShow = 'event';
         else if (typeToShow == 'news tips')
           typeToShow = 'news_tip';
