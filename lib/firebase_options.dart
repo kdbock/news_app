@@ -26,13 +26,6 @@ class DefaultFirebaseOptions {
         return ios;
       case TargetPlatform.macOS:
         return macos;
-      case TargetPlatform.windows:
-        return windows;
-      case TargetPlatform.linux:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       default:
         throw UnsupportedError(
           'DefaultFirebaseOptions are not supported for this platform.',
@@ -56,7 +49,8 @@ class DefaultFirebaseOptions {
     projectId: 'neuse-news-df5fd',
     databaseURL: 'https://neuse-news-df5fd-default-rtdb.firebaseio.com',
     storageBucket: 'neuse-news-df5fd.firebasestorage.app',
-    iosClientId: '236600949564-nrl089v9mqt33l2sfpdmdttangdtr01a.apps.googleusercontent.com',
+    iosClientId:
+        '236600949564-nrl089v9mqt33l2sfpdmdttangdtr01a.apps.googleusercontent.com',
     iosBundleId: 'com.wordnerd.neusenews',
   );
 
@@ -77,7 +71,8 @@ class DefaultFirebaseOptions {
     projectId: 'neuse-news-df5fd',
     databaseURL: 'https://neuse-news-df5fd-default-rtdb.firebaseio.com',
     storageBucket: 'neuse-news-df5fd.firebasestorage.app',
-    iosClientId: '236600949564-eclf8t63s95aaasic4emeol55eh32hdt.apps.googleusercontent.com',
+    iosClientId:
+        '236600949564-eclf8t63s95aaasic4emeol55eh32hdt.apps.googleusercontent.com',
     iosBundleId: 'n',
   );
 
@@ -90,5 +85,4 @@ class DefaultFirebaseOptions {
     databaseURL: 'https://neuse-news-df5fd-default-rtdb.firebaseio.com',
     storageBucket: 'neuse-news-df5fd.firebasestorage.app',
   );
-
 }

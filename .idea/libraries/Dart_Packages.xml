@@ -352,6 +352,27 @@
             </list>
           </value>
         </entry>
+        <entry key="firebase_app_check">
+          <value>
+            <list>
+              <option value="$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_app_check-0.2.2/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="firebase_app_check_platform_interface">
+          <value>
+            <list>
+              <option value="$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_app_check_platform_interface-0.1.0+29/lib" />
+            </list>
+          </value>
+        </entry>
+        <entry key="firebase_app_check_web">
+          <value>
+            <list>
+              <option value="$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_app_check_web-0.1.2/lib" />
+            </list>
+          </value>
+        </entry>
         <entry key="firebase_auth">
           <value>
             <list>
@@ -1540,6 +1561,9 @@
       <root url="file://$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_analytics-10.10.7/lib" />
       <root url="file://$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_analytics_platform_interface-3.10.8/lib" />
       <root url="file://$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_analytics_web-0.5.7+7/lib" />
+      <root url="file://$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_app_check-0.2.2/lib" />
+      <root url="file://$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_app_check_platform_interface-0.1.0+29/lib" />
+      <root url="file://$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_app_check_web-0.1.2/lib" />
       <root url="file://$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_auth-4.16.0/lib" />
       <root url="file://$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_auth_platform_interface-7.3.0/lib" />
       <root url="file://$PROJECT_DIR$/../.pub-cache/hosted/pub.dev/firebase_auth_web-5.8.13/lib" />

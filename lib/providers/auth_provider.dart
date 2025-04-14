@@ -42,21 +42,27 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final docSnapshot =
-          await _firestore.collection('users').doc(_user!.uid).get();
+      final docRef = _firestore.collection('users').doc(_user!.uid);
+      final docSnapshot = await docRef.get();
 
       if (docSnapshot.exists) {
-        _userData = docSnapshot.data();
-        debugPrint('User data fetched: $_userData');
+        // Safely convert to Map by explicitly recreating the map
+        final data = docSnapshot.data();
+        if (data != null) {
+          _userData = Map<String, dynamic>.from(data);
+          debugPrint('User data fetched: $_userData');
+        }
       } else {
         // Create a new user document if it doesn't exist
         final newUserData = {
           'email': _user!.email,
           'displayName': _user!.displayName ?? _user!.email?.split('@')[0],
           'firstName': _user!.displayName?.split(' ')[0] ?? '',
-          'lastName': (_user!.displayName != null && _user!.displayName!.split(' ').length > 1)
-              ? _user!.displayName!.split(' ')[1]
-              : '',
+          'lastName':
+              (_user!.displayName != null &&
+                      _user!.displayName!.split(' ').length > 1)
+                  ? _user!.displayName!.split(' ')[1]
+                  : '',
           'photoURL': _user!.photoURL,
           'isAdmin': false,
           'isContributor': false,

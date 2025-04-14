@@ -38,6 +38,8 @@ import 'package:neusenews/features/events/screens/event_detail_screen.dart';
 // Add imports for new authentication screens
 import 'package:neusenews/features/users/screens/register_screen.dart';
 import 'package:neusenews/features/users/screens/password_reset_screen.dart';
+// Add this import
+import 'package:firebase_app_check/firebase_app_check.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -58,6 +60,17 @@ void main() async {
       // Rethrow or handle other errors as needed
       rethrow;
     }
+  }
+
+  // Inside main() function, after Firebase initialization:
+  try {
+    await FirebaseAppCheck.instance.activate(
+      // Debug providers for development
+      androidProvider: AndroidProvider.debug,
+      appleProvider: AppleProvider.debug,
+    );
+  } catch (e) {
+    debugPrint("App Check initialization error: $e");
   }
 
   // Initialize the service locator

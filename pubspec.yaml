@@ -9,15 +9,16 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  # Use consistent Firebase versions
-  firebase_core: ^2.1.1  # Last version supporting iOS 11.0
-  firebase_auth: ^4.1.1  # Compatible with firebase_core 2.1.1
+  # Use consistent Firebase versions for iOS 13+ support
+  firebase_core: ^2.16.0
+  firebase_auth: ^4.10.0
   # Adjust other Firebase packages accordingly
-  firebase_storage: ^11.2.2
-  cloud_firestore: ^4.8.0 
-  cloud_functions: ^4.3.2 # Correct package name
-  firebase_analytics: ^10.4.2
+  firebase_storage: ^11.2.6
+  cloud_firestore: ^4.9.0 
+  cloud_functions: ^4.4.0 # Correct package name
+  firebase_analytics: ^10.5.0
   firebase_messaging: ^14.6.7  # Add this line
+  firebase_app_check: ^0.2.2  # Downgraded as suggested
   flutter_local_notifications: ^9.9.1  # Replace current flutter_local_notifications with this version
   provider: ^6.0.5
   google_sign_in: ^6.1.5           # Google Auth
@@ -49,7 +50,7 @@ dependencies:
   geolocator: ^10.0.0
   geocoding: ^2.1.1
   get_it: ^7.6.0
-  firebase_crashlytics: ^3.0.0
+  firebase_crashlytics: ^3.3.5
   shimmer: ^3.0.0
   # Add new package for DNS resolution compatible with http ^1.2.0
   # REMOVE THIS LINE:

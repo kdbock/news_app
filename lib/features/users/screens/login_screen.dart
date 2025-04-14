@@ -74,9 +74,17 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       print("Generic error: $e");
-      setState(() {
-        _errorMessage = 'An unexpected error occurred. Please try again.';
-      });
+      // Only set error message for non-Pigeon errors
+      if (!e.toString().contains('PigeonUserDetails')) {
+        setState(() {
+          _errorMessage = 'An unexpected error occurred. Please try again.';
+        });
+      } else {
+        // For Pigeon errors, check if we're logged in anyway
+        if (FirebaseAuth.instance.currentUser != null && mounted) {
+          Navigator.pushReplacementNamed(context, '/dashboard');
+        }
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

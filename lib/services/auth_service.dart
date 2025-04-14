@@ -11,36 +11,42 @@ class AuthService {
   // Get current user
   User? get currentUser => _auth.currentUser;
 
-  // Login with email and password
+  // Login with email and password - fixed to handle the type casting issue
   Future<User?> login(String email, String password) async {
     try {
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      // Approach 1: Direct access with explicit type handling
+      UserCredential credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
 
-      // This is crucial - update user document in Firestore if needed
-      if (userCredential.user != null) {
-        await _updateUserLastLogin(userCredential.user!.uid);
-      }
-
-      return userCredential.user;
+      // Return user directly without accessing properties that might trigger Pigeon
+      return credential.user;
     } catch (e) {
       print('Login error: $e');
+
+      // Approach 2: Check if login succeeded despite the error
+      if (e.toString().contains('PigeonUserDetails')) {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          // Login actually succeeded despite the error
+          return currentUser;
+        }
+      }
       rethrow;
     }
   }
 
-  // Register with email and password
+  // Register with email and password - same fix applied
   Future<User?> register(String email, String password) async {
     try {
-      final userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      // Force direct access
+      final authResult = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
 
-      if (userCredential.user != null) {
-        await _firestore.collection('users').doc(userCredential.user!.uid).set({
+      // Explicitly access the user property
+      final User? user = authResult.user;
+
+      if (user != null) {
+        await _firestore.collection('users').doc(user.uid).set({
           'email': email,
           'createdAt': FieldValue.serverTimestamp(),
           'lastLogin': FieldValue.serverTimestamp(),
@@ -52,14 +58,14 @@ class AuthService {
         });
       }
 
-      return userCredential.user;
+      return user;
     } catch (e) {
       print('Registration error: $e');
       rethrow;
     }
   }
 
-  // Sign in with Google
+  // Google sign-in - same fix applied
   Future<User?> signInWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
@@ -72,21 +78,27 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _auth.signInWithCredential(credential);
+      // Force direct access
+      final authResult = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
+
+      // Explicitly access the user property
+      final User? user = authResult.user;
 
       // Update or create user document in Firestore
-      if (userCredential.user != null) {
-        await _updateUserDataAfterSocialLogin(userCredential.user!);
+      if (user != null) {
+        await _updateUserDataAfterSocialLogin(user);
       }
 
-      return userCredential.user;
+      return user;
     } catch (e) {
       print('Google sign-in error: $e');
       return null;
     }
   }
 
-  // Sign in with Apple
+  // Apple sign-in - same fix applied
   Future<User?> signInWithApple() async {
     try {
       final appleCredential = await SignInWithApple.getAppleIDCredential(
@@ -101,18 +113,24 @@ class AuthService {
         accessToken: appleCredential.authorizationCode,
       );
 
-      final userCredential = await _auth.signInWithCredential(oauthCredential);
+      // Force direct access
+      final authResult = await FirebaseAuth.instance.signInWithCredential(
+        oauthCredential,
+      );
+
+      // Explicitly access the user property
+      final User? user = authResult.user;
 
       // Update or create user document in Firestore
-      if (userCredential.user != null) {
+      if (user != null) {
         await _updateUserDataAfterSocialLogin(
-          userCredential.user!,
+          user,
           firstName: appleCredential.givenName,
           lastName: appleCredential.familyName,
         );
       }
 
-      return userCredential.user;
+      return user;
     } catch (e) {
       print('Apple sign-in error: $e');
       return null;
@@ -186,7 +204,12 @@ class AuthService {
 
   // Logout
   Future<void> logout() async {
-    await _googleSignIn.signOut();
-    return _auth.signOut();
+    try {
+      await _googleSignIn.signOut();
+      await _auth.signOut();
+    } catch (e) {
+      print('Logout error: $e');
+      rethrow;
+    }
   }
 }
