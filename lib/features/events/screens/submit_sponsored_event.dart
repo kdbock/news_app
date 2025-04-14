@@ -289,24 +289,42 @@ class _SubmitSponsoredEventScreenState
     try {
       String? imageUrl;
       if (_eventImages.isNotEmpty) {
-        final File imageFile = File(_eventImages.first.path);
+        try {
+          final File imageFile = File(_eventImages.first.path);
 
-        // Create a reference to Firebase Storage with a unique name
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('event_images')
-            .child(
-              '${DateTime.now().millisecondsSinceEpoch}_${_eventImages.first.name}',
-            );
+          // Create a reference to Firebase Storage with a unique name
+          final storageRef = FirebaseStorage.instance
+              .ref()
+              .child('event_images')
+              .child(
+                '${DateTime.now().millisecondsSinceEpoch}_${_eventImages.first.name}',
+              );
 
-        // Upload the file
-        final uploadTask = storageRef.putFile(imageFile);
+          // Try the direct approach first
+          try {
+            final uploadTask = await storageRef.putFile(imageFile);
+            imageUrl = await uploadTask.ref.getDownloadURL();
+          } catch (e) {
+            if (e.toString().contains('PigeonSettableMetadata') ||
+                e.toString().contains('null object reference')) {
+              // Fallback approach with explicit metadata
+              final metadata = SettableMetadata(
+                contentType: 'image/jpeg',
+                customMetadata: {'picked': 'true'},
+              );
 
-        // Get the download URL after upload completes
-        final taskSnapshot = await uploadTask;
-        imageUrl = await taskSnapshot.ref.getDownloadURL();
+              final uploadTask = await storageRef.putFile(imageFile, metadata);
+              imageUrl = await uploadTask.ref.getDownloadURL();
+            } else {
+              rethrow;
+            }
+          }
 
-        debugPrint('Image uploaded to: $imageUrl');
+          debugPrint('Image uploaded to: $imageUrl');
+        } catch (e) {
+          debugPrint('Error uploading event image: $e');
+          // Continue without image if upload fails
+        }
       }
 
       // Create the event document in Firestore with ALL required fields

@@ -77,6 +77,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _errorMessage = _getFirebaseError(e.code);
       });
     } catch (e) {
+      // Handle the Pigeon error specifically
+      if (e.toString().contains('PigeonUserDetails')) {
+        // Check if registration was actually successful
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser != null) {
+          // Registration was successful despite the error
+          await _saveUserData(currentUser.uid);
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, '/dashboard');
+          }
+          return; // Exit early to avoid showing error
+        }
+      }
+
+      // For other errors, show error message
       setState(() {
         _errorMessage = 'An unexpected error occurred. Please try again.';
       });

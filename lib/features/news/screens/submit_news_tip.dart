@@ -247,29 +247,55 @@ class _SubmitNewsTipScreenState extends State<SubmitNewsTipScreen> {
         List<String> mediaUrls = [];
 
         for (final XFile media in _mediaFiles) {
-          final File file = File(media.path);
-          final String fileName =
-              '${DateTime.now().millisecondsSinceEpoch}_${media.name}';
+          try {
+            final File file = File(media.path);
+            final String fileName =
+                '${DateTime.now().millisecondsSinceEpoch}_${media.name}';
 
-          // Create storage reference
-          final storageRef = FirebaseStorage.instance
-              .ref()
-              .child('news_tips')
-              .child(docRef.id)
-              .child(fileName);
+            // Create storage reference
+            final storageRef = FirebaseStorage.instance
+                .ref()
+                .child('news_tips')
+                .child(docRef.id)
+                .child(fileName);
 
-          // Upload file
-          final uploadTask = await storageRef.putFile(file);
+            // Use this modified upload approach instead
+            try {
+              // Try the direct approach first
+              final uploadTask = await storageRef.putFile(file);
+              final downloadUrl = await uploadTask.ref.getDownloadURL();
+              mediaUrls.add(downloadUrl);
+            } catch (e) {
+              if (e.toString().contains('PigeonSettableMetadata') ||
+                  e.toString().contains('null object reference')) {
+                // Fallback approach with explicit metadata
+                final metadata = SettableMetadata(
+                  contentType: 'image/jpeg', // Set appropriate content type
+                  customMetadata: {
+                    'picked': 'true',
+                  }, // Add minimal custom metadata
+                );
 
-          // Get download URL
-          final downloadUrl = await uploadTask.ref.getDownloadURL();
-          mediaUrls.add(downloadUrl);
+                final uploadTask = await storageRef.putFile(file, metadata);
+                final downloadUrl = await uploadTask.ref.getDownloadURL();
+                mediaUrls.add(downloadUrl);
+              } else {
+                // If it's not the Pigeon error, rethrow
+                rethrow;
+              }
+            }
 
-          debugPrint('Uploaded file to: $downloadUrl');
+            debugPrint('Uploaded file to: ${mediaUrls.last}');
+          } catch (e) {
+            debugPrint('Error uploading media: $e');
+            // Continue with other uploads even if this one failed
+          }
         }
 
-        // Update document with media URLs
-        await docRef.update({'mediaUrls': mediaUrls});
+        // Only update if we have successful uploads
+        if (mediaUrls.isNotEmpty) {
+          await docRef.update({'mediaUrls': mediaUrls});
+        }
       }
 
       if (mounted) {
