@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // Add this import
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
+import 'package:fl_chart/fl_chart.dart'; // For charts
 
 class AdManagementScreen extends StatefulWidget {
   const AdManagementScreen({super.key});
@@ -15,10 +16,22 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
   List<Map<String, dynamic>> _pendingAds = [];
   List<Map<String, dynamic>> _activeAds = [];
 
+  // Analytics data
+  int _totalAds = 0;
+  int _totalImpressions = 0;
+  int _totalClicks = 0;
+  double _totalRevenue = 0.0;
+  double _averageCTR = 0.0;
+
+  // Time period analytics data
+  Map<String, dynamic> _monthlyData = {};
+  Map<String, dynamic> _advertiserPerformance = {};
+
   @override
   void initState() {
     super.initState();
     _loadAds();
+    _loadAnalyticsData();
   }
 
   Future<void> _loadAds() async {
@@ -74,6 +87,8 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
               'createdAt': data['createdAt']?.toDate() ?? DateTime.now(),
               'targetUrl': data['targetUrl'] ?? '',
               'status': data['status'] ?? 'active',
+              'impressions': data['impressions'] ?? 0,
+              'clicks': data['clicks'] ?? 0,
             };
           }).toList();
 
@@ -84,9 +99,129 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading ads: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading ads: $e')));
+      }
+    }
+  }
+
+  Future<void> _loadAnalyticsData() async {
+    try {
+      // Get all ads (not just active or pending)
+      final adsSnapshot =
+          await FirebaseFirestore.instance.collection('ads').get();
+
+      int totalAds = adsSnapshot.size;
+      int totalImpressions = 0;
+      int totalClicks = 0;
+      double totalRevenue = 0.0;
+
+      // Monthly data for charts
+      Map<int, int> monthlyImpressions = {};
+      Map<int, int> monthlyClicks = {};
+      Map<int, double> monthlyRevenue = {};
+      Map<String, Map<String, dynamic>> advertiserStats = {};
+
+      // Initialize monthly data
+      final now = DateTime.now();
+      for (int i = 5; i >= 0; i--) {
+        final month = now.month - i > 0 ? now.month - i : now.month - i + 12;
+        monthlyImpressions[month] = 0;
+        monthlyClicks[month] = 0;
+        monthlyRevenue[month] = 0.0;
+      }
+
+      // Process all ads
+      for (var doc in adsSnapshot.docs) {
+        final data = doc.data();
+        final impressions = data['impressions'] ?? 0;
+        final clicks = data['clicks'] ?? 0;
+        final cost = (data['cost'] ?? 0).toDouble();
+        final businessId = data['businessId'] ?? 'unknown';
+        final businessName = data['businessName'] ?? 'Unknown Business';
+
+        totalImpressions += (impressions as int);
+        totalClicks += (clicks as num).toInt();
+        totalRevenue += cost;
+
+        // Update monthly data if ad has startDate
+        if (data['startDate'] != null) {
+          final startDate = (data['startDate'] as Timestamp).toDate();
+          if (startDate.isAfter(DateTime(now.year, now.month - 6))) {
+            final month = startDate.month;
+            monthlyImpressions[month] =
+                (monthlyImpressions[month] ?? 0) + impressions.toInt();
+            monthlyClicks[month] = (monthlyClicks[month] ?? 0) + clicks.toInt();
+            monthlyRevenue[month] = (monthlyRevenue[month] ?? 0) + cost;
+          }
+        }
+
+        // Update advertiser stats
+        if (!advertiserStats.containsKey(businessId)) {
+          advertiserStats[businessId] = {
+            'businessName': businessName,
+            'impressions': 0,
+            'clicks': 0,
+            'revenue': 0.0,
+            'adCount': 0,
+          };
+        }
+        advertiserStats[businessId]!['impressions'] += impressions.toInt();
+        advertiserStats[businessId]!['clicks'] += clicks.toInt();
+        advertiserStats[businessId]!['revenue'] += cost;
+        advertiserStats[businessId]!['adCount'] += 1;
+      }
+
+      // Calculate CTR
+      final averageCTR =
+          totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0.0;
+
+      // Create chart data
+      final List<FlSpot> impressionsData = [];
+      final List<FlSpot> clicksData = []; // Add this line
+      final List<FlSpot> revenueData = [];
+
+      monthlyImpressions.forEach((month, value) {
+        impressionsData.add(FlSpot(month.toDouble(), value.toDouble()));
+      });
+
+      monthlyClicks.forEach((month, value) {
+        clicksData.add(FlSpot(month.toDouble(), value.toDouble()));
+      });
+
+      monthlyRevenue.forEach((month, value) {
+        revenueData.add(FlSpot(month.toDouble(), value));
+      });
+
+      // Sort data
+      impressionsData.sort((a, b) => a.x.compareTo(b.x));
+      revenueData.sort((a, b) => a.x.compareTo(b.x));
+
+      // Sort advertisers by revenue
+      final sortedAdvertisers =
+          advertiserStats.entries.toList()..sort(
+            (a, b) => (b.value['revenue'] as double).compareTo(
+              a.value['revenue'] as double,
+            ),
+          );
+
+      setState(() {
+        _totalAds = totalAds;
+        _totalImpressions = totalImpressions;
+        _totalClicks = totalClicks;
+        _totalRevenue = totalRevenue;
+        _averageCTR = averageCTR;
+        _monthlyData = {
+          'impressions': impressionsData,
+          'clicks': clicksData, // Add this line
+          'revenue': revenueData,
+        };
+        _advertiserPerformance = Map.fromEntries(sortedAdvertisers.take(10));
+      });
+    } catch (e) {
+      debugPrint('Error loading analytics data: $e');
     }
   }
 
@@ -98,15 +233,20 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
         'reviewedBy': FirebaseAuth.instance.currentUser?.uid,
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ad approved successfully!')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ad approved successfully!')),
+        );
+      }
 
       _loadAds(); // Refresh list
+      _loadAnalyticsData(); // Refresh analytics
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error approving ad: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error approving ad: $e')));
+      }
     }
   }
 
@@ -152,15 +292,20 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
           'reviewedBy': FirebaseAuth.instance.currentUser?.uid,
         });
 
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Ad rejected')));
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Ad rejected')));
+        }
 
         _loadAds(); // Refresh list
+        _loadAnalyticsData(); // Refresh analytics
       } catch (e) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error rejecting ad: $e')));
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error rejecting ad: $e')));
+        }
       }
     }
   }
@@ -174,18 +319,26 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
     }
 
     return DefaultTabController(
-      length: 2,
+      length: 3, // Now 3 tabs: Pending, Active, Analytics
       child: Column(
         children: [
           TabBar(
             labelColor: const Color(0xFFd2982a),
             unselectedLabelColor: Colors.grey[600],
             indicatorColor: const Color(0xFFd2982a),
-            tabs: const [Tab(text: 'Pending Review'), Tab(text: 'Active Ads')],
+            tabs: const [
+              Tab(text: 'Pending Review'),
+              Tab(text: 'Active Ads'),
+              Tab(text: 'Analytics'), // New tab!
+            ],
           ),
           Expanded(
             child: TabBarView(
-              children: [_buildPendingAdsList(), _buildActiveAdsList()],
+              children: [
+                _buildPendingAdsList(),
+                _buildActiveAdsList(),
+                _buildAnalyticsView(), // New view!
+              ],
             ),
           ),
         ],
@@ -194,6 +347,7 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
   }
 
   Widget _buildPendingAdsList() {
+    // Existing implementation...
     if (_pendingAds.isEmpty) {
       return const Center(
         child: Padding(
@@ -227,6 +381,7 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
   }
 
   Widget _buildActiveAdsList() {
+    // Existing implementation...
     if (_activeAds.isEmpty) {
       return const Center(
         child: Padding(
@@ -259,6 +414,378 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
     );
   }
 
+  // NEW METHOD: Analytics View
+  Widget _buildAnalyticsView() {
+    return RefreshIndicator(
+      onRefresh: _loadAnalyticsData,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Overall metrics
+            _buildMetricsOverview(),
+
+            const SizedBox(height: 24),
+
+            // Performance charts
+            _buildPerformanceCharts(),
+
+            const SizedBox(height: 24),
+
+            // Top advertisers
+            _buildTopAdvertisers(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW METHOD: Metrics overview cards
+  Widget _buildMetricsOverview() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Advertising Overview',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        GridView.count(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisCount: 2,
+          childAspectRatio: 1, // Change from 1.5 to 1.7 for more height
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          children: [
+            _buildMetricCard(
+              'Total Ads',
+              _totalAds.toString(),
+              Icons.ad_units,
+              const Color(0xFFd2982a),
+            ),
+            _buildMetricCard(
+              'Total Impressions',
+              NumberFormat.compact().format(_totalImpressions),
+              Icons.visibility,
+              Colors.blue,
+            ),
+            _buildMetricCard(
+              'Total Clicks',
+              NumberFormat.compact().format(_totalClicks),
+              Icons.touch_app,
+              Colors.green,
+            ),
+            _buildMetricCard(
+              'Revenue',
+              NumberFormat.currency(symbol: '\$').format(_totalRevenue),
+              Icons.attach_money,
+              Colors.purple,
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Average Click-Through Rate',
+                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${_averageCTR.toStringAsFixed(2)}%',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFd2982a),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: _averageCTR / 100,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFFd2982a),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // NEW METHOD: Performance charts
+  Widget _buildPerformanceCharts() {
+    if (_monthlyData.isEmpty || (_monthlyData['impressions'] as List).isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final impressionsData = _monthlyData['impressions'] as List<FlSpot>;
+    final revenueData = _monthlyData['revenue'] as List<FlSpot>;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Performance Trends',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+
+        // Impressions chart
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Monthly Impressions',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 200,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(show: false),
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              final month = value.toInt();
+                              return Text(
+                                DateFormat.MMM().format(DateTime(0, month)),
+                                style: const TextStyle(fontSize: 12),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: impressionsData,
+                          isCurved: true,
+                          gradient: const LinearGradient(
+                            colors: [Colors.blue, Colors.lightBlue],
+                          ),
+                          barWidth: 4,
+                          isStrokeCapRound: true,
+                          dotData: const FlDotData(show: false),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                Color.fromRGBO(
+                                  0,
+                                  122,
+                                  255,
+                                  0.3,
+                                ), // Blue with 0.3 opacity
+                                Color.fromRGBO(
+                                  104,
+                                  195,
+                                  255,
+                                  0.1,
+                                ), // Light blue with 0.1 opacity
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      borderData: FlBorderData(show: false),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Revenue chart
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Monthly Revenue',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 200,
+                  child: LineChart(
+                    LineChartData(
+                      gridData: FlGridData(show: false),
+                      titlesData: FlTitlesData(
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 40,
+                            getTitlesWidget: (value, meta) {
+                              return Text(
+                                '\$${value.toInt()}',
+                                style: const TextStyle(fontSize: 12),
+                              );
+                            },
+                          ),
+                        ),
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            getTitlesWidget: (value, meta) {
+                              final month = value.toInt();
+                              return Text(
+                                DateFormat.MMM().format(DateTime(0, month)),
+                                style: const TextStyle(fontSize: 12),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      lineBarsData: [
+                        LineChartBarData(
+                          spots: revenueData,
+                          isCurved: true,
+                          gradient: const LinearGradient(
+                            colors: [Colors.purple, Colors.purpleAccent],
+                          ),
+                          barWidth: 4,
+                          isStrokeCapRound: true,
+                          dotData: const FlDotData(show: false),
+                          belowBarData: BarAreaData(
+                            show: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                Color.fromRGBO(
+                                  128,
+                                  0,
+                                  128,
+                                  0.3,
+                                ), // Purple with 0.3 opacity
+                                Color.fromRGBO(
+                                  255,
+                                  0,
+                                  255,
+                                  0.1,
+                                ), // Purple accent with 0.1 opacity
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      borderData: FlBorderData(show: false),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // NEW METHOD: Top advertisers table
+  Widget _buildTopAdvertisers() {
+    if (_advertiserPerformance.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Top Advertisers',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('Business')),
+                DataColumn(label: Text('Ads')),
+                DataColumn(label: Text('Impressions')),
+                DataColumn(label: Text('Clicks')),
+                DataColumn(label: Text('Revenue')),
+                DataColumn(label: Text('CTR')),
+              ],
+              rows:
+                  _advertiserPerformance.entries.map((entry) {
+                    final business = entry.value;
+                    final impressions = business['impressions'] as int;
+                    final clicks = business['clicks'] as int;
+                    final ctr =
+                        impressions > 0 ? (clicks / impressions) * 100 : 0.0;
+
+                    return DataRow(
+                      cells: [
+                        DataCell(Text(business['businessName'] ?? 'Unknown')),
+                        DataCell(Text(business['adCount'].toString())),
+                        DataCell(
+                          Text(NumberFormat.compact().format(impressions)),
+                        ),
+                        DataCell(Text(NumberFormat.compact().format(clicks))),
+                        DataCell(
+                          Text('\$${business['revenue'].toStringAsFixed(2)}'),
+                        ),
+                        DataCell(Text('${ctr.toStringAsFixed(2)}%')),
+                      ],
+                    );
+                  }).toList(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMetricCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 32),
+            const SizedBox(height: 8),
+            Text(title, style: TextStyle(color: Colors.grey[700])),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAdCard(Map<String, dynamic> ad, {required bool isPending}) {
     final dateFormat = DateFormat('MMM d, yyyy');
     final startDate = ad['startDate'];
@@ -276,7 +803,7 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with business info
+          // Your existing ad card implementation
           Container(
             padding: const EdgeInsets.all(12.0),
             decoration: BoxDecoration(
@@ -385,6 +912,27 @@ class _AdManagementScreenState extends State<AdManagementScreen> {
                       ),
                     ],
                   ),
+
+                // Performance metrics for active ads
+                if (!isPending && ad['impressions'] != null) ...[
+                  const Divider(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Impressions: ${NumberFormat.compact().format(ad['impressions'])}',
+                      ),
+                      Text(
+                        'Clicks: ${NumberFormat.compact().format(ad['clicks'] ?? 0)}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'CTR: ${ad['impressions'] > 0 ? ((ad['clicks'] ?? 0) / ad['impressions'] * 100).toStringAsFixed(2) : 0}%',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
               ],
             ),
           ),

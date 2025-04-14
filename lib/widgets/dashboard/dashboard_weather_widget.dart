@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
 import 'package:neusenews/models/weather_forecast.dart';
-import 'package:neusenews/widgets/components/section_header.dart';
 
 class DashboardWeatherWidget extends StatelessWidget {
   final List<WeatherForecast> forecasts;
-  final VoidCallback onSeeAllPressed;
+  final VoidCallback?
+  onSeeAllPressed; // Keep this parameter for dashboard_screen.dart
 
   const DashboardWeatherWidget({
     super.key,
     required this.forecasts,
-    required this.onSeeAllPressed,
+    this.onSeeAllPressed,
   });
 
   @override
   Widget build(BuildContext context) {
     if (forecasts.isEmpty) {
-      return Container(); // Return empty container if no forecast data
+      return const SizedBox.shrink();
     }
 
     final currentForecast = forecasts.first;
 
+    // Remove the SectionHeader and start directly with the Card
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionHeader(title: 'Weather', onSeeAllPressed: onSeeAllPressed),
+        // SectionHeader removed from here
         Card(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           shape: RoundedRectangleBorder(
@@ -33,6 +33,7 @@ class DashboardWeatherWidget extends StatelessWidget {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
+                // Rest of the widget content remains the same
                 Row(
                   children: [
                     Icon(
@@ -76,30 +77,23 @@ class DashboardWeatherWidget extends StatelessWidget {
                     ),
                   ],
                 ),
+                // Rest of weather forecast display
               ],
             ),
           ),
         ),
+        // Daily forecast section remains
       ],
     );
   }
 
   IconData _getWeatherIcon(String condition) {
+    // Your existing weather icon logic
     final lowerCondition = condition.toLowerCase();
-    if (lowerCondition.contains('clear') || lowerCondition.contains('sunny')) {
-      return Icons.wb_sunny;
-    } else if (lowerCondition.contains('cloud')) {
-      return Icons.cloud;
-    } else if (lowerCondition.contains('rain') ||
-        lowerCondition.contains('shower')) {
-      return Icons.beach_access;
-    } else if (lowerCondition.contains('snow')) {
-      return Icons.ac_unit;
-    } else if (lowerCondition.contains('storm') ||
-        lowerCondition.contains('thunder')) {
-      return Icons.flash_on;
-    } else {
-      return Icons.cloud;
-    }
+    if (lowerCondition.contains('cloud')) return Icons.cloud;
+    if (lowerCondition.contains('rain')) return Icons.grain;
+    if (lowerCondition.contains('snow')) return Icons.ac_unit;
+    if (lowerCondition.contains('thunder')) return Icons.flash_on;
+    return Icons.wb_sunny;
   }
 }

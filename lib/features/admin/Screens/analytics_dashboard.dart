@@ -27,6 +27,9 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard> {
   List<Map<String, dynamic>> _recentEvents = [];
   List<FlSpot> _viewsData = [];
   List<FlSpot> _revenueData = [];
+  List<FlSpot> _userGrowthData = [];
+  Map<String, int> _userDemographics = {};
+  Map<String, double> _userEngagementData = {};
 
   @override
   void initState() {
@@ -122,8 +125,17 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard> {
       }
 
       // Generate sample data for charts if real data not available
-      final List<FlSpot> viewsData = _generateSampleViewsData();
+      final List<FlSpot> viewsData = await _getArticleViewsData();
       final List<FlSpot> revenueData = _generateSampleRevenueData();
+
+      // Load user growth data
+      final userGrowthData = await _getUserGrowthData();
+
+      // Load user demographics
+      final userDemographics = await _getUserDemographics();
+
+      // Load user engagement data
+      final userEngagement = await _getUserEngagement();
 
       if (mounted) {
         setState(() {
@@ -151,6 +163,9 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard> {
 
           _viewsData = viewsData;
           _revenueData = revenueData;
+          _userGrowthData = userGrowthData;
+          _userDemographics = userDemographics;
+          _userEngagementData = userEngagement;
 
           _isLoading = false;
         });
@@ -168,19 +183,19 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard> {
     }
   }
 
-  List<FlSpot> _generateSampleViewsData() {
-    // Generate last 30 days of sample data
-    final List<FlSpot> spots = [];
-    final now = DateTime.now();
+  Future<List<FlSpot>> _getArticleViewsData() async {
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('article_metrics')
+            .orderBy('date')
+            .limit(30)
+            .get();
 
-    for (int i = 0; i < 30; i++) {
-      final day = now.subtract(Duration(days: 29 - i));
-      // Generate random view count between 100 and 1000
-      final viewCount = 100 + (900 * day.day / 31);
-      spots.add(FlSpot(i.toDouble(), viewCount));
-    }
-
-    return spots;
+    return snapshot.docs.map((doc) {
+      final date = doc['date'].toDate();
+      final views = doc['views'] ?? 0;
+      return FlSpot(date.millisecondsSinceEpoch.toDouble(), views.toDouble());
+    }).toList();
   }
 
   List<FlSpot> _generateSampleRevenueData() {
@@ -196,6 +211,113 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard> {
     }
 
     return spots;
+  }
+
+  Future<List<FlSpot>> _getUserGrowthData() async {
+    // Get users grouped by join date (createdAt field)
+    final result =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .orderBy('createdAt')
+            .get();
+
+    // Count users by date
+    final Map<String, int> usersByDate = {};
+    int runningTotal = 0;
+
+    for (final doc in result.docs) {
+      if (doc.data().containsKey('createdAt') &&
+          doc.data()['createdAt'] != null) {
+        final Timestamp createdAt = doc.data()['createdAt'];
+        final String dateKey = DateFormat(
+          'yyyy-MM-dd',
+        ).format(createdAt.toDate());
+
+        usersByDate[dateKey] = (usersByDate[dateKey] ?? 0) + 1;
+      }
+    }
+
+    // Convert to spots for the chart
+    final List<FlSpot> spots = [];
+    final sortedDates = usersByDate.keys.toList()..sort();
+
+    for (int i = 0; i < sortedDates.length; i++) {
+      final date = DateTime.parse(sortedDates[i]);
+      runningTotal += usersByDate[sortedDates[i]] ?? 0;
+      spots.add(FlSpot(i.toDouble(), runningTotal.toDouble()));
+    }
+
+    return spots;
+  }
+
+  Future<Map<String, int>> _getUserDemographics() async {
+    // Get user data for demographic analysis
+    final result = await FirebaseFirestore.instance.collection('users').get();
+
+    // Track demographics
+    final Map<String, int> demographics = {
+      'Admin': 0,
+      'Contributor': 0,
+      'Investor': 0,
+      'Customer': 0,
+    };
+
+    for (final doc in result.docs) {
+      if (doc.data()['isAdmin'] == true) {
+        demographics['Admin'] = (demographics['Admin'] ?? 0) + 1;
+      }
+      if (doc.data()['isContributor'] == true) {
+        demographics['Contributor'] = (demographics['Contributor'] ?? 0) + 1;
+      }
+      if (doc.data()['isInvestor'] == true) {
+        demographics['Investor'] = (demographics['Investor'] ?? 0) + 1;
+      }
+      if (doc.data()['isCustomer'] == true) {
+        demographics['Customer'] = (demographics['Customer'] ?? 0) + 1;
+      }
+    }
+
+    return demographics;
+  }
+
+  Future<Map<String, double>> _getUserEngagement() async {
+    // This would use actual login data, but for now we'll estimate
+    final result =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .orderBy('lastLogin', descending: true)
+            .limit(30)
+            .get();
+
+    // Track engagement
+    final Map<String, double> engagement = {
+      'Daily Active Users': 0,
+      'Weekly Active Users': 0,
+      'Monthly Active Users': 0,
+    };
+
+    final now = DateTime.now();
+
+    for (final doc in result.docs) {
+      final lastLogin = doc.data()['lastLogin'] as Timestamp?;
+      if (lastLogin != null) {
+        final loginDate = lastLogin.toDate();
+        if (loginDate.isAfter(now.subtract(Duration(days: 1)))) {
+          engagement['Daily Active Users'] =
+              (engagement['Daily Active Users'] ?? 0) + 1;
+        }
+        if (loginDate.isAfter(now.subtract(Duration(days: 7)))) {
+          engagement['Weekly Active Users'] =
+              (engagement['Weekly Active Users'] ?? 0) + 1;
+        }
+        if (loginDate.isAfter(now.subtract(Duration(days: 30)))) {
+          engagement['Monthly Active Users'] =
+              (engagement['Monthly Active Users'] ?? 0) + 1;
+        }
+      }
+    }
+
+    return engagement;
   }
 
   @override
@@ -297,6 +419,58 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard> {
               ),
 
               const SizedBox(height: 24),
+
+              // User Analytics Section
+              const Text(
+                'User Analytics',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+
+              // User Growth Chart
+              const Text(
+                'User Growth Over Time',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 200,
+                child:
+                    _userGrowthData.isEmpty
+                        ? const Center(
+                          child: Text('No user growth data available'),
+                        )
+                        : _buildLineChart(
+                          _userGrowthData,
+                          Colors.purple.shade400,
+                        ),
+              ),
+              const SizedBox(height: 16),
+
+              // User Demographics
+              const Text(
+                'User Types Distribution',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 200,
+                child:
+                    _userDemographics.isEmpty
+                        ? const Center(
+                          child: Text('No demographic data available'),
+                        )
+                        : _buildPieChart(),
+              ),
+              const SizedBox(height: 16),
+
+              // User Engagement
+              const Text(
+                'User Engagement',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 8),
+              _buildEngagementBars(),
 
               // Recent content
               const Text(
@@ -494,5 +668,89 @@ class _AnalyticsDashboardState extends State<AnalyticsDashboard> {
 
   String _formatCurrency(double amount) {
     return NumberFormat.currency(symbol: '\$', decimalDigits: 0).format(amount);
+  }
+
+  Widget _buildPieChart() {
+    return PieChart(
+      PieChartData(
+        sections:
+            _userDemographics.entries.map((entry) {
+              Color color;
+              switch (entry.key) {
+                case 'Admin':
+                  color = Colors.red;
+                  break;
+                case 'Contributor':
+                  color = Colors.blue;
+                  break;
+                case 'Investor':
+                  color = Colors.green;
+                  break;
+                default:
+                  color = Colors.amber;
+              }
+
+              return PieChartSectionData(
+                value: entry.value.toDouble(),
+                title: '${entry.key}\n${entry.value}',
+                color: color,
+                radius: 80,
+                titleStyle: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              );
+            }).toList(),
+        sectionsSpace: 2,
+        centerSpaceRadius: 40,
+      ),
+    );
+  }
+
+  Widget _buildEngagementBars() {
+    return Container(
+      height: 120,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children:
+            _userEngagementData.entries.map((entry) {
+              final percentage = (entry.value * 100).toStringAsFixed(1);
+              return Column(
+                children: [
+                  Expanded(
+                    child: Container(
+                      width: 60,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [Colors.blue.shade100, Colors.blue.shade900],
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        width: 60,
+                        height: entry.value * 70, // Scale to height
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    entry.key,
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                  ),
+                  Text('$percentage%', style: const TextStyle(fontSize: 12)),
+                ],
+              );
+            }).toList(),
+      ),
+    );
   }
 }

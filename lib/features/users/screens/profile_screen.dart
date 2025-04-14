@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:neusenews/features/users/screens/edit_profile_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:neusenews/providers/auth_provider.dart' as app_auth;
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -32,11 +34,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final String email = user.email ?? '';
     final String phone = userData?['phone'] ?? '';
     final String zipCode = userData?['zipCode'] ?? '';
-    final String birthday = userData?['birthday'] ?? '';
+    final String birthday = formatTimestamp(userData?['birthday']);
     final bool textAlerts = userData?['textAlerts'] ?? false;
     final bool dailyDigest = userData?['dailyDigest'] ?? false;
     final bool sportsNewsletter = userData?['sportsNewsletter'] ?? false;
     final bool politicalNewsletter = userData?['politicalNewsletter'] ?? false;
+    final dynamic createdAt = userData?['createdAt'];
+    final String formattedDate = formatTimestamp(createdAt);
 
     // Display user profile
     return Scaffold(
@@ -239,5 +243,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  // Helper method to format timestamp
+  String formatTimestamp(dynamic timestamp) {
+    if (timestamp is Timestamp) {
+      return DateFormat('MMM d, yyyy').format(timestamp.toDate());
+    }
+    return 'N/A';
   }
 }

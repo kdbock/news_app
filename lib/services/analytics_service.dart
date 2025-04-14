@@ -9,7 +9,11 @@ class AnalyticsService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Log article view event
-  Future<void> logArticleView(String articleId, String title, String category) async {
+  Future<void> logArticleView(
+    String articleId,
+    String title,
+    String category,
+  ) async {
     try {
       await _analytics.logEvent(
         name: 'article_view',
@@ -30,11 +34,13 @@ class AnalyticsService {
   // Increment article view count in Firestore
   Future<void> _incrementArticleView(String articleId) async {
     try {
-      DocumentReference articleRef = _firestore.collection('article_metrics').doc(articleId);
-      
+      DocumentReference articleRef = _firestore
+          .collection('article_metrics')
+          .doc(articleId);
+
       await _firestore.runTransaction((transaction) async {
         DocumentSnapshot snapshot = await transaction.get(articleRef);
-        
+
         if (!snapshot.exists) {
           transaction.set(articleRef, {
             'views': 1,
@@ -47,11 +53,12 @@ class AnalyticsService {
           });
         }
       });
-      
+
       // Also store user-specific view if logged in
       final user = _auth.currentUser;
       if (user != null) {
-        await _firestore.collection('user_activity')
+        await _firestore
+            .collection('user_activity')
             .doc(user.uid)
             .collection('article_views')
             .add({
@@ -68,7 +75,7 @@ class AnalyticsService {
   Future<void> logSearch(String searchTerm) async {
     try {
       await _analytics.logSearch(searchTerm: searchTerm);
-      
+
       // Store search term in Firestore for trending searches
       await _firestore.collection('search_analytics').add({
         'search_term': searchTerm,
@@ -110,11 +117,12 @@ class AnalyticsService {
   // Get trending articles
   Future<List<Map<String, dynamic>>> getTrendingArticles() async {
     try {
-      QuerySnapshot snapshot = await _firestore
-          .collection('article_metrics')
-          .orderBy('views', descending: true)
-          .limit(5)
-          .get();
+      QuerySnapshot snapshot =
+          await _firestore
+              .collection('article_metrics')
+              .orderBy('views', descending: true)
+              .limit(5)
+              .get();
 
       return snapshot.docs
           .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
@@ -126,10 +134,7 @@ class AnalyticsService {
   }
 
   // Set user properties
-  Future<void> setUserProperties({
-    String? userType,
-    String? zipCode,
-  }) async {
+  Future<void> setUserProperties({String? userType, String? zipCode}) async {
     try {
       if (userType != null) {
         await _analytics.setUserProperty(name: 'user_type', value: userType);
@@ -150,5 +155,19 @@ class AnalyticsService {
     } catch (e) {
       debugPrint('Error tracking article view: $e');
     }
+  }
+
+  // In analytics_service.dart, add proper Firebase Analytics implementation
+  Future<void> trackArticleView(String articleId) async {
+    await _analytics.logEvent(
+      name: 'article_view',
+      parameters: {'article_id': articleId},
+    );
+
+    // Also store in Firestore for custom analytics
+    await _firestore.collection('article_metrics').doc(articleId).update({
+      'views': FieldValue.increment(1),
+      'last_viewed': FieldValue.serverTimestamp(),
+    });
   }
 }

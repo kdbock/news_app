@@ -3,16 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:neusenews/models/article.dart';
 import 'package:provider/provider.dart';
 import 'package:neusenews/widgets/app_drawer.dart';
-import 'package:neusenews/widgets/components/section_header.dart';
 import 'package:neusenews/providers/news_provider.dart';
 import 'package:neusenews/providers/weather_provider.dart';
 import 'package:neusenews/services/connectivity_service.dart';
 import 'package:neusenews/widgets/news_card_mini.dart';
-import 'package:neusenews/widgets/news_card.dart'; // Add this import for NewsCard
+// Add this import for NewsCard
 import 'package:neusenews/widgets/dashboard/dashboard_weather_widget.dart';
 import 'package:neusenews/widgets/category_navigation_bar.dart';
 import 'package:neusenews/widgets/bottom_nav_bar.dart';
-import 'package:neusenews/services/news_service.dart';
 import 'package:neusenews/widgets/dashboard/dashboard_sponsored_article.dart';
 import 'package:neusenews/providers/events_provider.dart'; // Ensure this is the correct path
 import 'package:neusenews/widgets/dashboard/dashboard_event.dart'; // Add this import
@@ -21,6 +19,8 @@ import 'package:neusenews/features/advertising/widgets/title_sponsor_banner.dart
 // Add this import at the top with your other imports
 import 'package:neusenews/features/advertising/widgets/in_feed_ad_banner.dart';
 import 'package:neusenews/features/advertising/models/ad_type.dart';
+// Add this import
+import 'package:neusenews/widgets/dashboard/section_header.dart';
 
 class DashboardScreen extends StatefulWidget {
   final bool showBottomNav;
@@ -201,9 +201,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
             builder: (context, weatherProvider, _) {
               final forecasts = weatherProvider.getDashboardForecast();
               if (forecasts.isEmpty) return const SizedBox.shrink();
-              return DashboardWeatherWidget(
-                forecasts: forecasts,
-                onSeeAllPressed: () => Navigator.pushNamed(context, '/weather'),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Add consistent header
+                  const SectionHeader(title: 'Weather'),
+                  DashboardWeatherWidget(
+                    forecasts: forecasts,
+                    onSeeAllPressed:
+                        () => Navigator.pushNamed(context, '/weather'),
+                  ),
+                ],
               );
             },
           ),
@@ -216,20 +224,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
             builder: (context, eventsProvider, _) {
               final events = eventsProvider.upcomingEvents;
               if (events.isEmpty) return const SizedBox.shrink();
-              return DashboardEventWidget(
-                events: events,
-                onEventTapped:
-                    (event) => Navigator.pushNamed(
-                      context,
-                      '/event',
-                      arguments: event,
-                    ),
-                onRsvpTapped: (event) {
-                  debugPrint('RSVP tapped for event: $event');
-                },
-                onAddEventTapped:
-                    () =>
-                        Navigator.pushNamed(context, '/submit-sponsored-event'),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Add consistent header
+                  SectionHeader(
+                    title: 'Upcoming Events',
+                    onSeeAllPressed:
+                        () => Navigator.pushNamed(context, '/calendar'),
+                  ),
+                  DashboardEventWidget(
+                    events: events,
+                    onEventTapped:
+                        (event) => Navigator.pushNamed(
+                          context,
+                          '/event',
+                          arguments: event,
+                        ),
+                    onRsvpTapped: (event) {
+                      debugPrint('RSVP tapped for event: $event');
+                    },
+                    onAddEventTapped:
+                        () => Navigator.pushNamed(
+                          context,
+                          '/submit-sponsored-event',
+                        ),
+                  ),
+                ],
               );
             },
           ),
@@ -237,16 +258,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             builder: (context, newsProvider, _) {
               final sponsored = newsProvider.sponsoredArticles;
               if (sponsored.isEmpty) return const SizedBox.shrink();
-              return DashboardSponsoredArticleWidget(
-                articles: sponsored,
-                onArticleTapped:
-                    (article) => Navigator.pushNamed(
-                      context,
-                      '/article',
-                      arguments: article,
-                    ),
-                onSeeAllPressed:
-                    () => Navigator.pushNamed(context, '/Sponsored'),
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Add consistent header
+                  SectionHeader(
+                    title: 'Sponsored Content',
+                    onSeeAllPressed:
+                        () => Navigator.pushNamed(context, '/Sponsored'),
+                  ),
+                  DashboardSponsoredArticleWidget(
+                    articles: sponsored,
+                    onArticleTapped:
+                        (article) => Navigator.pushNamed(
+                          context,
+                          '/article',
+                          arguments: article,
+                        ),
+                    onSeeAllPressed:
+                        () => Navigator.pushNamed(context, '/Sponsored'),
+                  ),
+                ],
               );
             },
           ),
@@ -392,41 +424,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
           key: _sectionKeys[categoryKey], // Add this line
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Uniform section headers
-            Container(
-              padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
-              decoration: const BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(color: Color(0xFFd2982a), width: 1.0),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF2d2c31),
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed:
-                        () => Navigator.pushNamed(
-                          context,
-                          '/news',
-                          arguments: title, // Pass the tab name as argument
-                        ),
-                    child: const Text(
-                      'See All',
-                      style: TextStyle(fontSize: 14, color: Color(0xFFd2982a)),
-                    ),
-                  ),
-                ],
-              ),
+            // Replace custom header with shared SectionHeader
+            SectionHeader(
+              title: title,
+              onSeeAllPressed:
+                  () => Navigator.pushNamed(context, '/news', arguments: title),
             ),
-            // Rest of the section remains the same
             SizedBox(
               height: 180,
               child: _buildNewsListWithAds(news, AdType.inFeedDashboard),

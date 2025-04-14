@@ -57,6 +57,10 @@ dependencies:
   # dns_handler: ^1.0.1  # Alternative DNS package
  
 
+  path: any
+  flutter_cache_manager: any
+  image: any
+  uuid: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

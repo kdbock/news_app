@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:neusenews/services/auth_service.dart';
+import 'package:neusenews/features/users/screens/register_screen.dart'; // Import RegisterScreen
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:neusenews/features/users/screens/register_screen.dart';
-import 'package:neusenews/features/users/screens/password_reset_screen.dart';
 import 'dart:io' show Platform;
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  // Add this parameter to define the initialTab
+  final int initialTab;
+
+  const LoginScreen({
+    Key? key,
+    this.initialTab = 0, // Default to login tab (0)
+  }) : super(key: key);
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final AuthService _authService = AuthService();
   final _loginFormKey = GlobalKey<FormState>();
 
@@ -23,10 +29,23 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   String _errorMessage = '';
 
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab, // Use the provided initialTab
+    );
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -264,104 +283,126 @@ class _LoginScreenState extends State<LoginScreen> {
         backgroundColor: Colors.white,
         automaticallyImplyLeading: false,
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20.0, 30.0, 20.0, 20.0),
-          child: Form(
-            key: _loginFormKey,
-            child: Column(
+      body: Column(
+        children: [
+          // Add TabBar at the top
+          TabBar(
+            controller: _tabController,
+            tabs: const [Tab(text: 'Login'), Tab(text: 'Register')],
+          ),
+          // Add TabBarView for the content
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
               children: [
-                Text(
-                  'Login to your Account',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF2d2c31),
+                // Login Form
+                SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: _buildLoginForm(),
                   ),
                 ),
-                const SizedBox(height: 20),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(labelText: 'Email*'),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (value) => value!.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 15),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: const InputDecoration(labelText: 'Password*'),
-                  obscureText: true,
-                  validator: (value) => value!.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/password-reset');
-                    },
-                    child: const Text('Forgot Password?'),
-                  ),
-                ),
-                if (_errorMessage.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Text(
-                      _errorMessage,
-                      style: const TextStyle(color: Colors.red),
-                    ),
-                  ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed:
-                        _isLoading
-                            ? null
-                            : () {
-                              if (_loginFormKey.currentState!.validate()) {
-                                _login();
-                              }
-                            },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      backgroundColor: const Color(0xFFd2982a),
-                    ),
-                    child:
-                        _isLoading
-                            ? const CircularProgressIndicator(
-                              color: Colors.white,
-                            )
-                            : const Text(
-                              'LOGIN',
-                              style: TextStyle(color: Colors.white),
-                            ),
-                  ),
-                ),
-                _buildSocialButtons(),
-                const SizedBox(height: 20),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text("Don't have an account?"),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/register');
-                      },
-                      child: const Text(
-                        'Register',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFd2982a),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                // Registration Form - Use your RegisterScreen
+                const RegisterScreen(),
               ],
             ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLoginForm() {
+    return Form(
+      key: _loginFormKey,
+      child: Column(
+        children: [
+          Text(
+            'Login to your Account',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF2d2c31),
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextFormField(
+            controller: _emailController,
+            decoration: const InputDecoration(labelText: 'Email*'),
+            keyboardType: TextInputType.emailAddress,
+            validator: (value) => value!.isEmpty ? 'Required' : null,
+          ),
+          const SizedBox(height: 15),
+          TextFormField(
+            controller: _passwordController,
+            decoration: const InputDecoration(labelText: 'Password*'),
+            obscureText: true,
+            validator: (value) => value!.isEmpty ? 'Required' : null,
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/password-reset');
+              },
+              child: const Text('Forgot Password?'),
+            ),
+          ),
+          if (_errorMessage.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Text(
+                _errorMessage,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed:
+                  _isLoading
+                      ? null
+                      : () {
+                        if (_loginFormKey.currentState!.validate()) {
+                          _login();
+                        }
+                      },
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                backgroundColor: const Color(0xFFd2982a),
+              ),
+              child:
+                  _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                        'LOGIN',
+                        style: TextStyle(color: Colors.white),
+                      ),
+            ),
+          ),
+          _buildSocialButtons(),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text("Don't have an account?"),
+              TextButton(
+                onPressed: () {
+                  Navigator.pushNamed(context, '/register');
+                },
+                child: const Text(
+                  'Register',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFd2982a),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

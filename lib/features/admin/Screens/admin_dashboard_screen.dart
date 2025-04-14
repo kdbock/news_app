@@ -7,6 +7,7 @@ import 'package:neusenews/features/admin/screens/analytics_dashboard.dart';
 import 'package:neusenews/features/admin/screens/user_management_screen.dart';
 import 'package:neusenews/features/advertising/screens/admin/ad_management_screen.dart';
 import 'package:neusenews/widgets/app_drawer.dart';
+import 'package:neusenews/features/admin/Screens/news_tip_review_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -25,7 +26,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
     _checkAdminAccess();
   }
 
@@ -136,6 +137,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             Tab(icon: Icon(Icons.dashboard), text: 'Overview'),
             Tab(icon: Icon(Icons.article), text: 'Articles'),
             Tab(icon: Icon(Icons.event), text: 'Events'),
+            Tab(icon: Icon(Icons.announcement), text: 'News Tips'),
             Tab(icon: Icon(Icons.ads_click), text: 'Ads'),
             Tab(icon: Icon(Icons.people), text: 'Users'),
           ],
@@ -149,6 +151,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           const AnalyticsDashboard(),
           const AdminReviewScreen(),
           const EventReviewScreen(),
+          const NewsTipReviewScreen(),
           const AdManagementScreen(),
           const UserManagementScreen(),
         ],

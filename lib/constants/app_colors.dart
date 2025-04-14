@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 class AppColors {
   // Primary branding colors
-  static const Color primary = Color(0xFF1E4371); // Navy blue
+  static const Color primary = Color.fromARGB(255, 0, 0, 0); // Black
+  static const Color primaryLight = Color(0xFFe8b545); // Light Gold
+  static const Color primaryDark = Color(0xFFd2982a);  // Dark Gold
+  static const Color primaryVariant = Color(0xFFd2982a); // Dark Gold
   static const Color accent = Color(0xFFd2982a);  // Gold
   static const Color background = Colors.white;
   static const Color text = Color(0xFF2d2c31);    // Dark Gray

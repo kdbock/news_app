@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:neusenews/widgets/app_drawer.dart';
 import 'package:provider/provider.dart';
 import 'package:neusenews/providers/weather_provider.dart';
 import 'package:neusenews/models/weather_forecast.dart';
