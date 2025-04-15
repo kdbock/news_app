@@ -71,6 +71,7 @@ class _SponsoredArticlesScreenState extends State<SponsoredArticlesScreen> {
             content: data['content']?.toString() ?? '',
             imageUrl: data['headerImageUrl'] ?? '',
             publishDate: publishDate,
+            publishedAt: publishDate, // Added the required parameter
             author: data['authorName'] ?? 'Sponsor',
             url: data['ctaLink'] ?? '',
             linkText: data['ctaText'] ?? 'Learn More',

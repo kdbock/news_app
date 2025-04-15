@@ -421,10 +421,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (news.isEmpty) return const SizedBox.shrink();
 
         return Column(
-          key: _sectionKeys[categoryKey], // Add this line
+          key: _sectionKeys[categoryKey],
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Replace custom header with shared SectionHeader
             SectionHeader(
               title: title,
               onSeeAllPressed:
@@ -432,7 +431,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             SizedBox(
               height: 180,
-              child: _buildNewsListWithAds(news, AdType.inFeedDashboard),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: news.length,
+                itemBuilder: (context, index) {
+                  return NewsCardMini(
+                    article: news[index],
+                    onTap:
+                        () => Navigator.pushNamed(
+                          context,
+                          '/article',
+                          arguments: news[index],
+                        ),
+                  );
+                },
+              ),
             ),
           ],
         );

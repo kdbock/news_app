@@ -439,6 +439,7 @@ class NewsService {
         title: article.title,
         author: article.author,
         publishDate: article.publishDate,
+        publishedAt: article.publishDate, // Added required parameter
         content: article.content,
         excerpt: article.excerpt,
         imageUrl: article.imageUrl,
@@ -546,6 +547,7 @@ class NewsService {
         excerpt: 'Mock excerpt for testing in simulator...',
         imageUrl: '',
         publishDate: DateTime.now().subtract(Duration(hours: i)),
+        publishedAt: DateTime.now().subtract(Duration(hours: i)), // Added required parameter
         url: 'https://example.com/article-$i',
         categories: ['Local News', 'Test'],
       ),
@@ -649,6 +651,7 @@ class NewsService {
       excerpt:
           content.length > 150 ? '${content.substring(0, 150)}...' : content,
       publishDate: publishDate,
+      publishedAt: publishDate, // Added the required 'publishedAt' parameter
       categories: categories, // Now this is guaranteed to be non-nullable
     );
   }

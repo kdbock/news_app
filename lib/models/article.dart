@@ -12,13 +12,16 @@ class Article {
   final List<String> categories;
   final bool isSponsored; // flag for sponsored content
   final String linkText; // custom text for CTA button
-  final String source; // source name (e.g., company name for sponsored articles)
+  final String
+  source; // source name (e.g., company name for sponsored articles)
   final bool isRead; // track read status
   final Map<String, double>? categoryScores;
   final String? primaryCategory;
+  final DateTime publishedAt; // Add this property
 
   // Add a getter for backward compatibility
-  String get link => url; // This ensures old code using article.link still works
+  String get link =>
+      url; // This ensures old code using article.link still works
 
   Article({
     this.id = '',
@@ -36,6 +39,7 @@ class Article {
     this.isRead = false,
     this.categoryScores,
     this.primaryCategory,
+    required this.publishedAt, // Initialize it
   });
 
   // Helper method to parse RSS dates
@@ -58,7 +62,7 @@ class Article {
           'yyyy-MM-ddTHH:mm:ssZ', // ISO 8601
           'yyyy-MM-dd HH:mm:ss', // Basic format
         ];
-        
+
         for (final format in formats) {
           try {
             return DateFormat(format).parse(dateString);
@@ -66,7 +70,7 @@ class Article {
             // Try next format
           }
         }
-        
+
         // If all format parses fail, return current date
         return DateTime.now();
       } catch (_) {
@@ -128,22 +132,25 @@ class Article {
       url: item.link ?? '',
       excerpt: excerpt,
       categories: categories,
-      isSponsored: categories.any((cat) => cat.toLowerCase().contains('sponsor')),
+      isSponsored: categories.any(
+        (cat) => cat.toLowerCase().contains('sponsor'),
+      ),
       source: _determineSource(item),
+      publishedAt: _parseRssDate(item.pubDate), // Initialize it
     );
   }
-  
+
   // Helper to determine source from feed item
   static String _determineSource(dynamic item) {
     try {
       if (item.dc?.creator != null) return item.dc!.creator;
       if (item.author != null) return item.author;
-      
+
       // Check if it's from specific feeds we know
       final link = item.link ?? '';
       if (link.contains('neusenewssports.com')) return 'Sports';
       if (link.contains('ncpoliticalnews.com')) return 'NC Politics';
-      
+
       return 'Neuse News';
     } catch (_) {
       return 'Neuse News';
@@ -164,9 +171,11 @@ class Article {
       isSponsored: true,
       linkText: data['ctaText'] ?? 'Learn More',
       source: data['companyName'] ?? 'Sponsored Content',
+      publishedAt:
+          data['publishedAt']?.toDate() ?? DateTime.now(), // Initialize it
     );
   }
-  
+
   // JSON serialization for caching
   Map<String, dynamic> toJson() {
     return {
@@ -185,21 +194,22 @@ class Article {
       'isRead': isRead,
       'categoryScores': categoryScores,
       'primaryCategory': primaryCategory,
+      'publishedAt': publishedAt.toIso8601String(), // Add this property
     };
   }
-  
+
   // JSON deserialization for caching
   factory Article.fromJson(Map<String, dynamic> json) {
     List<String> categoryList = [];
     if (json['categories'] != null) {
       categoryList = List<String>.from(json['categories']);
     }
-    
+
     Map<String, double>? scores;
     if (json['categoryScores'] != null) {
       scores = Map<String, double>.from(json['categoryScores']);
     }
-    
+
     return Article(
       id: json['id'] ?? '',
       title: json['title'] ?? 'Untitled Article',
@@ -216,6 +226,9 @@ class Article {
       isRead: json['isRead'] ?? false,
       categoryScores: scores,
       primaryCategory: json['primaryCategory'],
+      publishedAt: DateTime.parse(
+        json['publishedAt'] as String,
+      ), // Parse the date
     );
   }
 
@@ -228,7 +241,7 @@ class Article {
     }
     return '';
   }
-  
+
   // Create a copy of the article with modified properties
   Article copyWith({
     String? id,
@@ -244,6 +257,7 @@ class Article {
     String? linkText,
     String? source,
     bool? isRead,
+    DateTime? publishedAt, // Add this property
   }) {
     return Article(
       id: id ?? this.id,
@@ -259,6 +273,7 @@ class Article {
       linkText: linkText ?? this.linkText,
       source: source ?? this.source,
       isRead: isRead ?? this.isRead,
+      publishedAt: publishedAt ?? this.publishedAt, // Initialize it
     );
   }
 

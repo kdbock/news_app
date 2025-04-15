@@ -279,6 +279,7 @@ class NewsProvider extends ChangeNotifier {
         excerpt: 'This is placeholder content for when the app is offline.',
         imageUrl: '',
         publishDate: DateTime.now().subtract(Duration(days: index)),
+        publishedAt: DateTime.now().subtract(Duration(days: index)), // Added required parameter
         url: '',
         categories: [category],
         primaryCategory: category,
@@ -337,6 +338,7 @@ class NewsProvider extends ChangeNotifier {
             'This is a sample article excerpt for ${category.toLowerCase()} news. The full article contains more details about this topic.',
         imageUrl: sampleImages[index % sampleImages.length],
         publishDate: DateTime.now().subtract(Duration(hours: index * 4)),
+        publishedAt: DateTime.now().subtract(Duration(hours: index * 4)), // Added required parameter
         url: 'https://example.com/article/$index',
         categories: [category],
         primaryCategory: category,

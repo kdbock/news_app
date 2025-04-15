@@ -43,6 +43,7 @@ class SponsoredArticleRepository {
             content: data['content']?.toString() ?? '',
             imageUrl: data['headerImageUrl'] ?? '',
             publishDate: publishDate,
+            publishedAt: publishDate,
             author: data['authorName'] ?? 'Sponsor',
             url: data['ctaLink'] ?? '',
             linkText: data['ctaText'] ?? 'Learn More',

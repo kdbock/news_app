@@ -100,12 +100,14 @@ class PushNotificationService {
     while (token == null && retryCount < 3) {
       try {
         token = await _messaging.getToken();
+        // Add this null check
         if (token != null) {
-          // Add this null check
           _saveTokenToPrefs(token);
+        }
+        if (token != null) {
           _saveTokenToFirestore(token);
         }
-      } catch (e) {
+            } catch (e) {
         retryCount++;
         debugPrint('FCM token retrieval attempt $retryCount failed: $e');
         await Future.delayed(Duration(seconds: 5 * retryCount));
