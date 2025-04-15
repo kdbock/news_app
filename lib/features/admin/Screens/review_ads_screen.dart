@@ -161,9 +161,7 @@ class _ReviewAdsScreenState extends State<ReviewAdsScreen> {
           ],
         );
       },
-    );
-
-    if (reason == null) return; // User canceled
+    ); // User canceled
 
     try {
       await _firestore.collection('ads').doc(ad.id).update({

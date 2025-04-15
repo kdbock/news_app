@@ -101,6 +101,7 @@ class PushNotificationService {
       try {
         token = await _messaging.getToken();
         if (token != null) {
+          // Add this null check
           _saveTokenToPrefs(token);
           _saveTokenToFirestore(token);
         }
@@ -324,7 +325,6 @@ class PushNotificationService {
 
   // Handle when user taps on notification to open app
 
-
   // Handle notification tap from local notification
   void _handleNotificationTap(String? payload) {
     if (payload != null) {
@@ -375,7 +375,10 @@ class PushNotificationService {
           break;
         case 'event':
           if (id != null) {
-            NavigationService.navigateTo(Routes.calendar, arguments: {'eventId': id});
+            NavigationService.navigateTo(
+              Routes.calendar,
+              arguments: {'eventId': id},
+            );
           } else {
             NavigationService.navigateTo(Routes.calendar);
           }
@@ -396,7 +399,6 @@ class PushNotificationService {
 
       // Get the token
       String? token = await _messaging.getToken();
-      if (token == null) return;
 
       // Store it in Firestore
       await _firestore.collection('users').doc(currentUser.uid).update({
@@ -497,13 +499,12 @@ class PushNotificationService {
   Future<void> _saveTokenToFirestore(String token) async {
     if (_auth.currentUser != null) {
       try {
-        await _firestore
-            .collection('users')
-            .doc(_auth.currentUser!.uid)
-            .update({
-          'fcmTokens': FieldValue.arrayUnion([token]),
-          'lastTokenUpdate': FieldValue.serverTimestamp(),
-        });
+        await _firestore.collection('users').doc(_auth.currentUser!.uid).update(
+          {
+            'fcmTokens': FieldValue.arrayUnion([token]),
+            'lastTokenUpdate': FieldValue.serverTimestamp(),
+          },
+        );
       } catch (e) {
         debugPrint('Error saving FCM token to Firestore: $e');
       }

@@ -1,7 +1,6 @@
-platform :ios, '14.0'
-
-# Set this to avoid App.framework issues
-ENV['SWIFT_VERSION'] = '5.0'
+Podfile
+# Uncomment this line to define a global platform for your project
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -15,14 +14,14 @@ project 'Runner', {
 def flutter_root
   generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
   unless File.exist?(generated_xcode_build_settings_path)
-    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+    raise "#{generated_xcode_build_settings_path} must exist"
   end
 
   File.foreach(generated_xcode_build_settings_path) do |line|
     matches = line.match(/FLUTTER_ROOT\=(.*)/)
     return matches[1].strip if matches
   end
-  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
+  raise "FLUTTER_ROOT not found"
 end
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
@@ -33,103 +32,55 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
-  # Explicitly specify Firebase
-  pod 'Firebase/Core'
+  # Add Firebase pod explicitly (this is important)
   pod 'FirebaseCore'
-
+  pod 'FirebaseAnalytics'
+ 
+  # This will install the correct versions of all dependencies
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
-end
 
-# Helper method to remove problematic flags
-def remove_flag(flags, flag_to_remove)
-  return if flags.nil?
-  flags.reject { |flag| flag.to_s.include?(flag_to_remove) }
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
 end
 
 post_install do |installer|
-  # Add this for Xcode 15+ compatibility
-  installer.generated_projects.each do |project|
-    project.targets.each do |target|
-      target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-        # Fix for Firebase
-        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
-      end
-    end
-  end
+  # Apply our gRPC template fix
+  system("./Scripts/fix_grpc_template.sh")
   
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     
-    # Handle BoringSSL-GRPC compiler flags
+    # Fix BoringSSL compiler flags
     if target.name == 'BoringSSL-GRPC'
-      target.source_build_phase.files.each do |file|
-        if file.settings && file.settings['COMPILER_FLAGS']
-          flags = file.settings['COMPILER_FLAGS'].split
-          flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' || flag == '-G' }
-          file.settings['COMPILER_FLAGS'] = flags.join(' ')
+      # Fix at the build phase level
+      target.build_configurations.each do |config|
+        # Remove problematic flags
+        if config.build_settings['OTHER_CFLAGS']
+          config.build_settings['OTHER_CFLAGS'] = config.build_settings['OTHER_CFLAGS'].gsub(/-G/, '')
+        end
+        if config.build_settings['OTHER_CPPFLAGS']
+          config.build_settings['OTHER_CPPFLAGS'] = config.build_settings['OTHER_CPPFLAGS'].gsub(/-G/, '')
         end
       end
       
-      # Apply additional BoringSSL settings through build configurations
-      target.build_configurations.each do |config|
-        # Set optimization level explicitly for this target
-        config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
-        
-        # Disable specific compiler warnings for BoringSSL
-        config.build_settings['WARNING_CFLAGS'] = ['$(inherited)', '-Wno-shorten-64-to-32', '-Wno-comma', '-Wno-unreachable-code']
-        
-        # Remove -G flag specifically
-        if config.build_settings['OTHER_CFLAGS'].is_a?(Array)
-          config.build_settings['OTHER_CFLAGS'] = config.build_settings['OTHER_CFLAGS'].reject { |flag| flag.include?('-G') }
-        end
-        if config.build_settings['OTHER_CPLUSPLUSFLAGS'].is_a?(Array)
-          config.build_settings['OTHER_CPLUSPLUSFLAGS'] = config.build_settings['OTHER_CPLUSPLUSFLAGS'].reject { |flag| flag.include?('-G') }
+      # Also fix at the file level
+      target.source_build_phase.files.each do |file|
+        if file.settings && file.settings['COMPILER_FLAGS']
+          flags = file.settings['COMPILER_FLAGS'].split
+          flags.reject! { |flag| flag == '-G' || flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }
+          file.settings['COMPILER_FLAGS'] = flags.join(' ')
         end
       end
     end
     
-    # Apply general settings to all targets
+    # Set iOS deployment target for all targets
     target.build_configurations.each do |config|
-      # Ensure Flutter.framework is correctly found
-      config.build_settings['FRAMEWORK_SEARCH_PATHS'] ||= [
-        "$(inherited)",
-        "$(PROJECT_DIR)/Flutter",
-        "$(PODS_ROOT)/**"
-      ]
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-      config.build_settings['ENABLE_BITCODE'] = 'NO'
-      config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
-      config.build_settings['SWIFT_VERSION'] = '5.0'
-      config.build_settings['ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-      
-      # Only needed for simulator builds on M1 Macs
-      if config.name == 'Debug' && config.build_settings['ARCHS'] == '$(ARCHS_STANDARD)'
+      # Fix for M1/M2 Mac simulators
+      if config.name == 'Debug'
         config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
-      end
-      
-      # Fix for the symlinks warnings
-      if target.name.start_with?("gRPC") || target.name.include?("BoringSSL")
-        config.build_settings['CLANG_WARN_DOCUMENTATION_COMMENTS'] = 'NO'
-      end
-      
-      # Fix for App.framework
-      config.build_settings['ONLY_ACTIVE_ARCH'] = 'NO'
-      
-      if config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < 14.0
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-      end
-      
-      # Important for M1/M2 Macs
-      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
-      
-      # Fix for Firebase header search paths
-      if target.name.start_with?('Firebase') || target.name.include?('Firebase')
-        config.build_settings['HEADER_SEARCH_PATHS'] ||= ['$(inherited)']
-        config.build_settings['HEADER_SEARCH_PATHS'] << '${PODS_ROOT}/Firebase/CoreOnly/Sources'
-        config.build_settings['OTHER_LDFLAGS'] ||= ['$(inherited)']
-        config.build_settings['OTHER_LDFLAGS'] << '-ObjC'
       end
     end
   end
